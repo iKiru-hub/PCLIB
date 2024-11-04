@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <Eigen/Dense>
+#include "utils.hpp"
 
 
 /* UTILS */
@@ -11,6 +12,7 @@ inline Eigen::Vector2d generalized_sigmoid(Eigen::Vector2d x,
     Eigen::Vector2d offset_vec = Eigen::Vector2d::Constant(offset);
     return (1.0 / (1.0 + (-gain * (x - offset_vec).array()).exp())).cwiseMin(clip);
 }
+
 
 class pcNN {
 public:
@@ -58,8 +60,58 @@ private:
 };
 
 
-
 namespace pcl {
+
+class SamplingModule {
+
+public:
+
+    // parameters
+    const float speed;
+    const std::array<float, 2> samples[9] = {
+        {-1.0, 1.0},
+        {0.0, 1.0},
+        {1.0, 1.0},
+        {-1.0, 0.0},
+        {0.0, 0.0},
+        {1.0, 0.0},
+        {-1.0, -1.0},
+        {0.0, -1.0},
+        {1.0, -1.0}
+    };
+    const std::array<int, 9> indexes = { 0, 1, 2, 3, 4, 5, 6, 7, 8};
+
+    const int num_samples = 9;
+    std::array<float, 9> values = { 0.0 };
+
+    // variables
+    int idx = -1;
+    std::array<bool, 9> available_indexes = { true, true, true, true, true, true, true, true, true};
+
+    SamplingModule(float speed) : speed(speed) {}
+
+    // sample a random index
+    int sample() {
+
+        int idx = -1;
+        bool found = false;
+        while (!found) {
+            int i = utils::random.getRandomInt(0, num_samples);
+
+            if (available_indexes[i]) {  // Check if the index is available
+                idx = i;  // Set idx to the found index
+                found = true;  // Mark as found
+            };
+        }
+        return idx;
+    }
+
+    void print() {
+        utils::logger("SamplingModule(speed=" + std::to_string(speed) + ")");
+    }
+
+};
+
 
 void print() {
     std::cout << "Hello from pcnn.hpp" << std::endl;
