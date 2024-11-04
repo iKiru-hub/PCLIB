@@ -1,4 +1,4 @@
-# Install script for directory: /Users/daniekru/Research/lab/pcpp
+# Install script for directory: /Users/daniekru/Research/lab/PCLIB
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -39,7 +39,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/Users/daniekru/Research/lab/pcpp/build/extern/pybind11/cmake_install.cmake")
+  include("/Users/daniekru/Research/lab/PCLIB/build/extern/pybind11/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -57,6 +57,6 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-  file(WRITE "/Users/daniekru/Research/lab/pcpp/build/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "/Users/daniekru/Research/lab/PCLIB/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

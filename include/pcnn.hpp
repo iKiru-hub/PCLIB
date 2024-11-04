@@ -1,6 +1,7 @@
 #pragma once
-#include <string>
+#include <iostream>
 #include <Eigen/Dense>
+
 
 /* UTILS */
 inline Eigen::Vector2d generalized_sigmoid(Eigen::Vector2d x,
@@ -41,6 +42,11 @@ public:
     void set_mask(const Eigen::Matrix2d& mask) { mask_ = mask; }
     void set_u(const Eigen::Vector2d& u) { u_ = u; }
 
+    // class representation
+    /* void print() { */
+    /*     std::cout << "pcNN(" << N << ", " << gain_ << ", " << offset_ << ")" << std::endl; */
+    /* } */
+
 private:
     const int N;
     const double gain_;
@@ -49,4 +55,14 @@ private:
     Eigen::Matrix2d C_;
     Eigen::Matrix2d mask_;
     Eigen::Vector2d u_;
+};
+
+
+
+namespace pcl {
+
+void print() {
+    std::cout << "Hello from pcnn.hpp" << std::endl;
+}
+
 };
