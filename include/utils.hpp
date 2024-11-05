@@ -37,6 +37,10 @@ public:
             << " | " << msg << std::endl;
     }
 
+    void space(const ::std::string &symbol = ".") {
+        std::cout << symbol << std::endl;
+    }
+
     template <std::size_t N>
     void log_arr(const std::array<float, N> &arr,
                   const std::string &src = "MAIN") {
@@ -85,7 +89,7 @@ public:
 
     // Template function to get a random element from an array
     template <std::size_t N>
-    int getRandomElement(const std::array<int, N>& container) {
+    int get_random_element(const std::array<int, N>& container) {
         // Check that the container is not empty
         if (container.empty()) {
             throw std::invalid_argument("Container must not be empty");
@@ -97,18 +101,18 @@ public:
     }
 
     // Function to get a random float within a specified range
-    float getRandomFloat(float min = 0.0f, float max = 1.0f) {
+    float get_random_float(float min = 0.0f, float max = 1.0f) {
         std::uniform_real_distribution<float> dist(min, max);
         return dist(gen);  // Use the member random engine
     }
 
     // random integer in the range [min, max]
-    int getRandomInt(int min, int max) {
+    int get_random_int(int min, int max) {
         std::uniform_int_distribution<int> dist(min, max);
         return dist(gen);
     }
 
-    void setSeed(int seed) {
+    void set_seed(int seed) {
         gen.seed(seed);
     }
 
@@ -124,7 +128,7 @@ namespace utils {
 
 //
 template <std::size_t N>
-int arrArgMax(std::array<float, N> arr) {
+int arr_argmax(std::array<float, N> arr) {
 
     // Get iterator to the maximum element
     auto max_it = std::max_element(arr.begin(), arr.end());

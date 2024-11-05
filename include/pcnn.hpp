@@ -65,93 +65,109 @@ private:
 };
 
 
-namespace pcl {
-
 // LEAKY VARIABLE
-template<int ndim>
-class LeakyVariable {
+class LeakyVariableND {
+public:
+    std::string name;
+
+    /* @brief Call the LeakyVariableND with a 2D input
+     * @param x A 2D input to the LeakyVariable */
+    void call(const Eigen::VectorXf& x) {
+
+        // Compute dv and update v
+        v += (Eigen::VectorXf::Constant(ndim, eq) - v) * tau + x;
+    }
+
+    LeakyVariableND(std::string name, float eq, float tau,
+                    size_t ndim)
+        : name(std::move(name)), eq(eq), tau(1.0f / tau),
+        ndim(ndim), v(Eigen::VectorXf::Constant(ndim, eq)) {
+        LOG("[+] LeakyVariableND created with name: " + this->name);
+    }
+
+    ~LeakyVariableND() {
+        LOG("[-] LeakyVariableND destroyed with name: " + name);
+    }
+
+    Eigen::VectorXf get_v() const {
+        return v;
+    }
+
+    void print_v() const {
+        std::cout << "v: " << v.transpose() << std::endl;
+    }
+
+    std::string str() const {
+        return "LeakyVariableND." + name;
+    }
+
+    int len() const {
+        return ndim;
+    }
+
+    void info() const {
+        LOG("LeakyVariableND." + name + "(eq=" +
+            std::to_string(eq) +
+            ", tau=" + std::to_string(tau) + ", ndim=" +
+            std::to_string(ndim) + ")");
+    }
+
+private:
+    float eq;
+    float tau;
+    size_t ndim;
+    Eigen::VectorXf v;
+};
+
+class LeakyVariable1D {
 public:
     std::string name;
 
     /* @brief Call the LeakyVariable with an input
      * @param input The input to the LeakyVariable
      * with `ndim` dimensions
-     *
     */
-    void call(std::array<float, ndim> input) {
-        std::array<float, ndim> dv = {0.0};
-        for (size_t i = 0; i < ndim; i++) {
-            dv[i] = (eq - v[i]) * tau + input[i];
-            v[i] = v[i] + (eq - v[i]) * tau + input[i];
-        }
-        printV();
+    void call(float x = 0.0) {
+        v = v + (eq - v) * tau + x;
     }
 
-    LeakyVariable(std::string name, float eq, float tau)
-        : name(std::move(name)), eq(eq), tau(1.0/tau){
+    LeakyVariable1D(std::string name, float eq,
+                    float tau)
+        : name(std::move(name)), eq(eq), tau(1.0/tau) {
 
-        v.fill(eq);
+        v = eq;
 
-        LOG("[+] LeakyVariable created with name: " + this->name);
+        LOG("[+] LeakyVariable1D created with name: " + this->name);
     }
 
-    ~LeakyVariable() {
-        LOG("[-] LeakyVariable destroyed with name: " + name);
+    ~LeakyVariable1D() {
+        LOG("[-] LeakyVariable1D destroyed with name: " + name);
     }
 
-    std::array<float, ndim> getV() const {
+    float get_v() {
         return v;
     }
 
-    void printV() const {
-        std::cout << "v: ";
-        for (size_t i = 0; i < ndim; i++) {
-            std::cout << v[i] << " ";
-        }
-        std::cout << std::endl;
+    std::string str() {
+        return "LeakyVariable." + name;
     }
 
-
-    void print() const {
-        LOG("LeakyVariable." + name);
+    int len() {
+        return 1;
     }
 
-    void info() const {
+    void info() {
         LOG("LeakyVariable." + name + "(eq=" + \
             std::to_string(eq) +
-            ", tau=" + std::to_string(tau) + ", ndim=" + \
-            std::to_string(ndim) + ")");
+            ", tau=" + std::to_string(tau) + ")");
     }
-
 
 private:
     float eq;
     float tau;
-    std::array<float, ndim> v;
+    float v;
 };
 
-
-void runLeaky() {
-    LeakyVariable<2> leaky("leaky", 0.0, 3.);
-    leaky.info();
-    leaky.printV();
-
-    std::array<float, 2> input = {0.5, 1.3};
-    std::array<float, 2> x = {0.0};
-
-    for (int i = 0; i < 10; i++) {
-
-        if (i == 5) {
-            x = input;
-        };
-
-        if (i == 7) {
-            x = {0.0};
-        };
-
-        leaky.call(x);
-    }
-}
 
 
 // SAMPLING MODULE
@@ -159,7 +175,10 @@ class SamplingModule {
 
 public:
 
-    SamplingModule(float speed) : speed(speed) {
+    std::string name;
+
+    SamplingModule(std::string name,
+                   float speed) : name(name), speed(speed) {
         utils::logging.log("[+] SamplingModule");
     }
 
@@ -167,12 +186,7 @@ public:
         utils::logging.log("[-] SamplingModule");
     }
 
-    void print() {
-        utils::logging.log("SamplingModule(speed=" + \
-                std::to_string(speed) + ")");
-    }
-
-    void call(bool keep) {
+    void call(bool keep = false) {
 
         // keep current state
         if (keep) {
@@ -183,13 +197,14 @@ public:
         // all samples have been used
         if (counter == num_samples) {
             keep = true;
-            idx = utils::arrArgMax(values);
+            idx = utils::arr_argmax(values);
             velocity = samples[idx];
-            utils::logging.log("-- all samples used, picked: " + std::to_string(idx));
+            utils::logging.log("-- all samples used, picked: " + \
+                               std::to_string(idx));
             return;
         };
 
-        idx = sampleIdx();
+        idx = sample_idx();
         available_indexes[idx] = false;
         velocity = samples[idx];
         utils::logging.log("-- sampled: " + std::to_string(idx));
@@ -204,19 +219,27 @@ public:
         return counter == num_samples;
     }
 
-    std::array<float, 2> getVelocity() {
-        return velocity;
+    std::string str() {
+        return "SamplingModule." + name;
     }
 
-    const char getIdx() {
-        return idx;
-    }
-
-    const char getSize() {
+    int len() {
         return num_samples;
     }
 
-    const float getMaxValue() {
+    std::array<float, 2> get_velocity() {
+        return velocity;
+    }
+
+    const int get_idx() {
+        return idx;
+    }
+
+    const int get_counter() {
+        return counter;
+    }
+
+    const float get_max_value() {
         if (counter == 0) {
             return 0.0;
         }
@@ -225,7 +248,7 @@ public:
 
     void reset() {
         idx = -1;
-        for (char i = 0; i < num_samples; i++) {
+        for (int i = 0; i < num_samples; i++) {
             available_indexes[i] = true;
         }
         values = { 0.0 };
@@ -247,10 +270,10 @@ private:
         {0.0, -1.0},
         {1.0, -1.0}
     };
-    const std::array<unsigned char, 9> indexes = { 0, 1, 2, 3, 4,
+    const std::array<unsigned int, 9> indexes = { 0, 1, 2, 3, 4,
                                           5, 6, 7, 8 };
-    unsigned char counter = 0;
-    const unsigned char num_samples = 9;
+    unsigned int counter = 0;
+    const unsigned int num_samples = 9;
     std::array<float, 9> values = { 0.0 };
     std::array<float, 2> velocity = { 0.0 };
 
@@ -260,12 +283,12 @@ private:
         true, true, true, true, true, true};
 
     // sample a random index
-    int sampleIdx() {
+    int sample_idx() {
 
         int idx = -1;
         bool found = false;
         while (!found) {
-            int i = utils::random.getRandomInt(0, num_samples);
+            int i = utils::random.get_random_int(0, num_samples);
 
             // Check if the index is available
             if (available_indexes[i]) {
@@ -280,6 +303,8 @@ private:
 
 };
 
+
+namespace pcl {
 
 
 };
