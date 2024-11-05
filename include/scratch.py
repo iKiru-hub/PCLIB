@@ -106,6 +106,7 @@ class SamplingPolicy:
         self._velocity = self._samples[self._idx]
 
         return self._velocity.copy(), False, self._idx, self._values
+
     def update(self, score: float):
 
         # --- normalize the score

@@ -2,6 +2,8 @@
 #include <iostream>
 #include <random>
 #include <array>
+#include <algorithm>
+#include <iterator>
 
 
 
@@ -16,6 +18,7 @@ std::string get_datetime() {
     strftime(buf, sizeof(buf), "%X", &tstruct);
     return buf;
 }
+
 
 class Logger {
 
@@ -119,46 +122,19 @@ private:
 namespace utils {
 
 
-/* RANDOM GENERATORS */
-
-
+//
 template <std::size_t N>
-int getRandomElement(const std::array<int, N>& container) {
-    // Check that the container is not empty
-    if (container.empty()) {
-        throw std::invalid_argument("Container must not be empty");
-    }
+int arrArgMax(std::array<float, N> arr) {
 
-    // Seed and random engine
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    // Get iterator to the maximum element
+    auto max_it = std::max_element(arr.begin(), arr.end());
 
-    // Create a distribution range from 0 to container.size() - 1
-    std::uniform_int_distribution<> dist(0, container.size() - 1);
-
-    // Generate a random index and return the element at that index
-    return container[dist(gen)];
+    // Calculate the index
+    return std::distance(arr.begin(), max_it);
 }
 
-void logger(const std::string &msg,
-            const std::string &src = "MAIN") {
-    std::cout << get_datetime() << " | " << src \
-        << " | " << msg << std::endl;
-}
 
-template <std::size_t N>
-void logger_arr(const std::array<float, N> &arr,
-                const std::string &src = "MAIN") {
-
-    std::cout << get_datetime() << " | " << src << " | [";
-    for (unsigned int i = 0; i < arr.size(); i++) {
-        std::cout << arr[i];
-        if (i != arr.size() - 1) {
-            std::cout << ", ";
-        }
-    }
-    std::cout << "]" << std::endl;
-}
+// objects
 
 Logger logging = Logger();
 RandomGenerator random = RandomGenerator();

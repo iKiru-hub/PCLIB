@@ -2,6 +2,7 @@
 #include <iostream>
 #include <Eigen/Dense>
 #include "utils.hpp"
+#include <unordered_map>
 
 
 /* UTILS */
@@ -66,6 +67,81 @@ class SamplingModule {
 
 public:
 
+    SamplingModule(float speed) : speed(speed) {
+        utils::logging.log("[+] SamplingModule");
+    }
+
+    ~SamplingModule() {
+        utils::logging.log("[-] SamplingModule");
+    }
+
+    void print() {
+        utils::logging.log("SamplingModule(speed=" + \
+                std::to_string(speed) + ")");
+    }
+
+    void call(bool keep) {
+
+        // keep current state
+        if (keep) {
+            utils::logging.log("-- keep");
+            return;
+        };
+
+        // all samples have been used
+        if (counter == num_samples) {
+            keep = true;
+            idx = utils::arrArgMax(values);
+            velocity = samples[idx];
+            utils::logging.log("-- all samples used, picked: " + std::to_string(idx));
+            return;
+        };
+
+        idx = sampleIdx();
+        available_indexes[idx] = false;
+        velocity = samples[idx];
+        utils::logging.log("-- sampled: " + std::to_string(idx));
+        return;
+    }
+
+    void update(float score) {
+        values[idx] = score;
+    }
+
+    bool is_done() {
+        return counter == num_samples;
+    }
+
+    std::array<float, 2> getVelocity() {
+        return velocity;
+    }
+
+    const char getIdx() {
+        return idx;
+    }
+
+    const char getSize() {
+        return num_samples;
+    }
+
+    const float getMaxValue() {
+        if (counter == 0) {
+            return 0.0;
+        }
+        return values[idx];
+    }
+
+    void reset() {
+        idx = -1;
+        for (char i = 0; i < num_samples; i++) {
+            available_indexes[i] = true;
+        }
+        values = { 0.0 };
+        counter = 0;
+    }
+
+private:
+
     // parameters
     const float speed;
     const std::array<float, 2> samples[9] = {
@@ -79,42 +155,39 @@ public:
         {0.0, -1.0},
         {1.0, -1.0}
     };
-    const std::array<int, 9> indexes = { 0, 1, 2, 3, 4, 5, 6, 7, 8};
-
-    const int num_samples = 9;
+    const std::array<unsigned char, 9> indexes = { 0, 1, 2, 3, 4,
+                                          5, 6, 7, 8 };
+    unsigned char counter = 0;
+    const unsigned char num_samples = 9;
     std::array<float, 9> values = { 0.0 };
+    std::array<float, 2> velocity = { 0.0 };
 
     // variables
     int idx = -1;
-    std::array<bool, 9> available_indexes = { true, true, true, true, true, true, true, true, true};
-
-    SamplingModule(float speed) : speed(speed) {}
+    std::array<bool, 9> available_indexes = { true, true, true,
+        true, true, true, true, true, true};
 
     // sample a random index
-    int sample() {
+    int sampleIdx() {
 
         int idx = -1;
         bool found = false;
         while (!found) {
             int i = utils::random.getRandomInt(0, num_samples);
 
-            if (available_indexes[i]) {  // Check if the index is available
+            // Check if the index is available
+            if (available_indexes[i]) {
                 idx = i;  // Set idx to the found index
                 found = true;  // Mark as found
             };
-        }
+        };
+        counter++;
         return idx;
     }
 
-    void print() {
-        utils::logger("SamplingModule(speed=" + std::to_string(speed) + ")");
-    }
 
 };
 
 
-void print() {
-    std::cout << "Hello from pcnn.hpp" << std::endl;
-}
 
 };
