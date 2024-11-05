@@ -87,3 +87,11 @@ if(APPLE)
         LINK_FLAGS "-stdlib=libc++ -mmacosx-version-min=10.9"
     )
 endif()
+
+
+# suppress warnings
+add_definitions(-w)
+
+# print that the warning suppression is on
+message(">>> Yo sup dawg, beware that warning suppression is on <<<")
+

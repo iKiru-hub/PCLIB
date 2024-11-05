@@ -5,12 +5,26 @@
 #include <iostream>
 #include <array>
 
-
 #define LOG(msg) utils::logging.log(msg, "TEST")
 
 
+// init
+void testSampling();
+void testLeaky();
+
+// MAIN
+
 int main() {
 
+    /* testSampling(); */
+    testLeaky();
+
+    return 0;
+}
+
+// definitions
+
+void testSampling() {
 
     pcl::SamplingModule sm = pcl::SamplingModule(10);
 
@@ -23,13 +37,20 @@ int main() {
             sm.update(utils::random.getRandomFloat());
         };
 
-        LOG("max " + std::to_string(sm.getMaxValue()));
-
         if (i == (sm.getSize() + 3)) {
             LOG("resetting...");
             sm.reset();
         };
     };
+};
 
-    return 0;
+
+
+void testLeaky() {
+
+    LOG("Testing LeakyVariable...");
+
+
+    pcl::runLeaky();
+
 }

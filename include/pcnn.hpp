@@ -1,8 +1,12 @@
-#pragma once
 #include <iostream>
 #include <Eigen/Dense>
 #include "utils.hpp"
 #include <unordered_map>
+#include <memory>
+#include <array>
+
+
+#define LOG(msg) utils::logging.log(msg, "PCNN")
 
 
 /* UTILS */
@@ -63,6 +67,94 @@ private:
 
 namespace pcl {
 
+// LEAKY VARIABLE
+template<int ndim>
+class LeakyVariable {
+public:
+    std::string name;
+
+    /* @brief Call the LeakyVariable with an input
+     * @param input The input to the LeakyVariable
+     * with `ndim` dimensions
+     *
+    */
+    void call(std::array<float, ndim> input) {
+        std::array<float, ndim> dv = {0.0};
+        for (size_t i = 0; i < ndim; i++) {
+            dv[i] = (eq - v[i]) * tau + input[i];
+            v[i] = v[i] + (eq - v[i]) * tau + input[i];
+        }
+        printV();
+    }
+
+    LeakyVariable(std::string name, float eq, float tau)
+        : name(std::move(name)), eq(eq), tau(1.0/tau){
+
+        v.fill(eq);
+
+        LOG("[+] LeakyVariable created with name: " + this->name);
+    }
+
+    ~LeakyVariable() {
+        LOG("[-] LeakyVariable destroyed with name: " + name);
+    }
+
+    std::array<float, ndim> getV() const {
+        return v;
+    }
+
+    void printV() const {
+        std::cout << "v: ";
+        for (size_t i = 0; i < ndim; i++) {
+            std::cout << v[i] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+
+    void print() const {
+        LOG("LeakyVariable." + name);
+    }
+
+    void info() const {
+        LOG("LeakyVariable." + name + "(eq=" + \
+            std::to_string(eq) +
+            ", tau=" + std::to_string(tau) + ", ndim=" + \
+            std::to_string(ndim) + ")");
+    }
+
+
+private:
+    float eq;
+    float tau;
+    std::array<float, ndim> v;
+};
+
+
+void runLeaky() {
+    LeakyVariable<2> leaky("leaky", 0.0, 3.);
+    leaky.info();
+    leaky.printV();
+
+    std::array<float, 2> input = {0.5, 1.3};
+    std::array<float, 2> x = {0.0};
+
+    for (int i = 0; i < 10; i++) {
+
+        if (i == 5) {
+            x = input;
+        };
+
+        if (i == 7) {
+            x = {0.0};
+        };
+
+        leaky.call(x);
+    }
+}
+
+
+// SAMPLING MODULE
 class SamplingModule {
 
 public:
