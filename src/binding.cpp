@@ -72,4 +72,16 @@ PYBIND11_MODULE(pclib, m) {
         .def("print_v", &LeakyVariableND::print_v)
         .def("info", &LeakyVariableND::info)
         .def("get_v", &LeakyVariableND::get_v);
+
+    // (InputFilter) Place Cell Layer
+    py::class_<PCLayer>(m, "PCLayer")
+        .def(py::init<int, float, std::array<float, 4>>(),
+             py::arg("n"),
+             py::arg("sigma"),
+             py::arg("bounds"))
+        .def("__call__", &PCLayer::call,
+             py::arg("x"))
+        .def("__str__", &PCLayer::str)
+        .def("__len__", &PCLayer::len)
+        .def("info", &PCLayer::info);
 }

@@ -89,6 +89,30 @@ def test_leakyND():
         f" after second call is not correct v={lv.get_v()}"
 
 
+def test_pclayer():
+
+    """
+    test the layer of hard-coded place cells
+    """
+
+    n = 3
+    sigma = 0.1
+    bounds = np.array([0., 1., 0., 1.])
+
+    # defintion
+    layer = pclib.PCLayer(n, sigma, bounds)
+
+    # check dimensions
+    assert n**2 == len(layer), f"Dimension of the layer is not " + \
+        f"correct {len(layer)}"
+
+    # check call
+    x = np.array([0.5, 0.5])
+    y = layer(x)
+
+    assert len(y) == n**2, f"Output of the layer is not" + \
+        f" correct {len(y)}"
+
 
 
 if __name__ == "__main__":

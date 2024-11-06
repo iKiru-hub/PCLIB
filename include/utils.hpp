@@ -1,4 +1,5 @@
 #pragma once
+#include <Eigen/Dense>
 #include <iostream>
 #include <random>
 #include <array>
@@ -136,6 +137,15 @@ int arr_argmax(std::array<float, N> arr) {
     // Calculate the index
     return std::distance(arr.begin(), max_it);
 }
+
+inline Eigen::Vector2d generalized_sigmoid(Eigen::Vector2d x,
+                                         double offset = 1.0,
+                                         double gain = 1.0,
+                                         double clip = 1.0) {
+    Eigen::Vector2d offset_vec = Eigen::Vector2d::Constant(offset);
+    return (1.0 / (1.0 + (-gain * (x - offset_vec).array()).exp())).cwiseMin(clip);
+}
+
 
 
 // objects

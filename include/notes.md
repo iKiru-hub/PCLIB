@@ -11,3 +11,15 @@ for seeding the base random generator
 srand(time(0));
 rand()
 ```
+
+
+
+# TODO
+
+[ ] sampling module
+[ ] leaky variable
+[ ] pcnn
+[ ] modulation
+[ ] circuit module
+[ ] experience module
+[ ] brain module

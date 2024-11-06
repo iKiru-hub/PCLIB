@@ -7,16 +7,11 @@
 
 
 #define LOG(msg) utils::logging.log(msg, "PCNN")
+#define SPACE utils::logging.space
 
 
-/* UTILS */
-inline Eigen::Vector2d generalized_sigmoid(Eigen::Vector2d x,
-                                         double offset = 1.0,
-                                         double gain = 1.0,
-                                         double clip = 1.0) {
-    Eigen::Vector2d offset_vec = Eigen::Vector2d::Constant(offset);
-    return (1.0 / (1.0 + (-gain * (x - offset_vec).array()).exp())).cwiseMin(clip);
-}
+/* PCNN */
+
 
 
 class pcNN {
@@ -30,7 +25,7 @@ public:
     }
 
     Eigen::Vector2d call(const Eigen::Vector2d& x) {
-        u_ = generalized_sigmoid(W_ * u_ + x, offset_, gain_, 0.01);
+        u_ = utils::generalized_sigmoid(W_ * u_ + x, offset_, gain_, 0.01);
         return u_;
     }
 
@@ -63,6 +58,86 @@ private:
     Eigen::Matrix2d mask_;
     Eigen::Vector2d u_;
 };
+
+
+class PCLayer {
+
+public:
+
+    /* @brief Call the PCLayer with a 2D input and compute
+     * the Gaussian distance to the centers
+     * @param x A 2D input to the PCLayer
+     */
+    Eigen::VectorXf call(const Eigen::Vector2f& x) {
+        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
+        for (int i = 0; i < N; i++) {
+            float dx = x(0) - centers(i, 0);
+            float dy = x(1) - centers(i, 1);
+            float dist_squared = std::pow(dx, 2) + std::pow(dy, 2);
+            y(i) = std::exp(-dist_squared / denom);
+        }
+
+        return y;
+    }
+
+    std::string str() {
+        return "PCLayer";
+    }
+
+    int len() {
+        return N;
+    }
+
+    std::string info() {
+        return "PCLayer(n=" + std::to_string(n) + \
+            ", sigma=" + std::to_string(sigma) + \
+            ", bounds=[" + std::to_string(bounds[0]);
+    }
+
+    PCLayer(int n, float sigma,
+            std::array<float, 4> bounds)
+        : N(std::pow(n, 2)), n(n), sigma(sigma), bounds(bounds) {
+
+        // Initialize the centers
+        centers = Eigen::MatrixXf::Zero(N, 2);
+
+        // Compute the centers
+        compute_centers();
+
+        LOG("[+] PCLayer created");
+    }
+
+    ~PCLayer() {
+        LOG("[-] PCLayer destroyed");
+    }
+
+private:
+
+    int N;
+    int n;
+    float sigma;
+    const float denom = 2 * sigma * sigma;
+    std::array<float, 4> bounds;
+    Eigen::MatrixXf centers;
+
+    void compute_centers() {
+
+        // calculate the spacing between the centers
+        // given the number of centers and the bounds
+        float x_spacing = (bounds[1] - bounds[0]) / (n - 1);
+        float y_spacing = (bounds[3] - bounds[2]) / (n - 1);
+
+        // Compute the centers
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                centers(i * n + j, 0) = bounds[0] + i * x_spacing;
+                centers(i * n + j, 1) = bounds[2] + j * y_spacing;
+            }
+        }
+    }
+
+};
+
 
 
 // LEAKY VARIABLE
@@ -119,6 +194,7 @@ private:
     Eigen::VectorXf v;
 };
 
+
 class LeakyVariable1D {
 public:
     std::string name;
@@ -137,7 +213,8 @@ public:
 
         v = eq;
 
-        LOG("[+] LeakyVariable1D created with name: " + this->name);
+        LOG("[+] LeakyVariable1D created with name: " + \
+            this->name);
     }
 
     ~LeakyVariable1D() {
@@ -167,7 +244,6 @@ private:
     float tau;
     float v;
 };
-
 
 
 // SAMPLING MODULE
@@ -305,6 +381,48 @@ private:
 
 
 namespace pcl {
+
+void test_layer() {
+
+    std::array<float, 4> bounds = {0.0, 1.0, 0.0, 1.0};
+
+    PCLayer layer = PCLayer(3, 0.1, bounds);
+    LOG(layer.str());
+    LOG(std::to_string(layer.len()));
+
+};
+
+void testSampling() {
+
+    /* pcl::SamplingModule sm = pcl::SamplingModule(10); */
+
+    /* sm.print(); */
+
+    /* bool keep = false; */
+    /* for (int i = 0; i < 28; i++) { */
+    /*     sm.call(keep); */
+    /*     if (!sm.is_done()) { */
+    /*         sm.update(utils::random.getRandomFloat()); */
+    /*     }; */
+
+    /*     if (i == (sm.getSize() + 3)) { */
+    /*         LOG("resetting..."); */
+    /*         sm.reset(); */
+    /*     }; */
+    /* }; */
+};
+
+
+
+void testLeaky() {
+
+    SPACE("#---#");
+
+    LOG("Testing LeakyVariable...");
+
+
+    SPACE("#---#");
+}
 
 
 };

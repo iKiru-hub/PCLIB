@@ -19,7 +19,8 @@ void testLeaky();
 int main() {
 
     /* testSampling(); */
-    testLeaky();
+    /* testLeaky(); */
+    pcl::test_layer();
 
     return 0;
 }

@@ -208,6 +208,117 @@ class SamplingPolicy:
 
 
 
+class InputFilter(ABC):
+
+    """
+    Abstract class for filtering inputs
+    """
+
+    @abstractmethod
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+
+    @abstractmethod
+    def __call__(self, x: np.ndarray):
+        pass
+
+
+
+class PClayer(InputFilter):
+
+    def __init__(self, n: int, sigma: int,
+                 policy: object=None, **kwargs):
+
+        self.N = n**2
+        self.n = n
+        self.bounds = kwargs.get("bounds", (0, 1, 0, 1))
+        self._k = kwargs.get("k", 4)
+        self.sigma = sigma
+        self.spacing = None
+        self._endpoints = kwargs.get("endpoints", True)
+        self.centers = self._make_centers()
+        self.centers = np.around(self.centers, 3)
+
+    def __repr__(self):
+        return f"PClayer(N={self.N}, s={self.sigma})"
+
+    def _make_centers(self) -> np.ndarray:
+
+        """
+        Make the tuning function for the neurons in the layer.
+
+        Returns
+        -------
+        centers : numpy.ndarray
+            centers for the neurons in the layer.
+        """
+
+        x_min, x_max, y_min, y_max = self.bounds
+
+        # check if it is a 2D grid or 1D
+        if x_min == x_max:
+
+            # Define the centers of the tuning functions
+            # over a 1D grid
+            x_centers = np.array([x_min] * self.N)
+            y_centers = np.linspace(y_min, y_max, self.N)
+            dim = 1
+
+        elif y_min == y_max:
+
+            # Define the centers of the tuning functions
+            # over a 1D grid
+            x_centers = np.linspace(x_min, x_max, self.N)
+            y_centers = np.array([y_min] * self.N)
+            dim = 1
+
+        else:
+
+            # Define the centers of the tuning functions
+            x_centers = np.linspace(x_min, x_max, self.n,
+                                    endpoint=self._endpoints)
+            y_centers = np.linspace(y_min, y_max, self.n,
+                                    endpoint=self._endpoints)
+            dim = 2
+
+        # Make the tuning function
+        centers = np.zeros((self.N, 2))
+        for i in range(self.N):
+
+            if dim == 1:
+                centers[i] = (x_centers[i], y_centers[i])
+                continue
+            centers[i] = (x_centers[i // self.n], 
+                          y_centers[i % self.n])
+
+        return centers
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+
+        """
+        Activation function of the neurons in the layer.
+
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Input to the activation function. Shape (n, 2)
+
+        Returns
+        -------
+        activation : numpy.ndarray
+            Activation of the neurons in the layer.
+        """
+
+        return np.exp(-np.linalg.norm(
+            x.reshape(-1, 2) - self.centers.reshape(-1, 1,
+                                        2), axis=2)**2 / self.sigma)
+
+    def render(self):
+        plt.scatter(self.centers[:, 0], self.centers[:, 1], s=10)
+        plt.axis('off')
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.show()
 
 
 
