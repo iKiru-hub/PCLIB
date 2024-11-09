@@ -10,51 +10,17 @@
 #define SPACE utils::logging.space
 
 
-// init
-void testSampling();
-void testLeaky();
-
 // MAIN
 
 int main() {
 
     /* testSampling(); */
     /* testLeaky(); */
-    pcl::test_layer();
+    /* pcl::test_layer(); */
+    pcl::test_pcnn();
 
     return 0;
 }
 
 // definitions
 
-void testSampling() {
-
-    /* pcl::SamplingModule sm = pcl::SamplingModule(10); */
-
-    /* sm.print(); */
-
-    /* bool keep = false; */
-    /* for (int i = 0; i < 28; i++) { */
-    /*     sm.call(keep); */
-    /*     if (!sm.is_done()) { */
-    /*         sm.update(utils::random.getRandomFloat()); */
-    /*     }; */
-
-    /*     if (i == (sm.getSize() + 3)) { */
-    /*         LOG("resetting..."); */
-    /*         sm.reset(); */
-    /*     }; */
-    /* }; */
-};
-
-
-
-void testLeaky() {
-
-    SPACE("#---#");
-
-    LOG("Testing LeakyVariable...");
-
-
-    SPACE("#---#");
-}

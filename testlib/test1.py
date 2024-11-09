@@ -114,6 +114,34 @@ def test_pclayer():
         f" correct {len(y)}"
 
 
+def test_pcnn():
+
+    """
+    test the PCNN network model
+    """
+
+    n = 3
+    Ni = 10
+    sigma = 0.1
+    bounds = np.array([0., 1., 0., 1.])
+    xfilter = pclib.PCLayer(n, sigma, bounds)
+
+    # definition
+    pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=0.1, offset=0.1,
+                      rep_threshold=0.1, rec_threshold=0.1,
+                      num_neighbors=8, trace_tau=0.1,
+                      xfilter=xfilter, name="2D")
+
+    assert len(pcnn) == Ni, f"Number of neurons is not " + \
+        f"correct {len(pcnn)}"
+
+    # check call
+    x = np.array([0.5, 0.5])
+    y = pcnn(x)
+
+    assert len(y) == Ni, f"Output of the network is not" + \
+        f" correct {len(y)}"
+
 
 if __name__ == "__main__":
     test_leakyND()

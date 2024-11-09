@@ -7,8 +7,14 @@
 #include <iterator>
 
 
+/* declare classes */
 
-/* MISCELLANEOUS */
+class Logger;
+class RandomGenerator;
+
+
+
+/* LOGGING */
 
 
 std::string get_datetime() {
@@ -56,6 +62,19 @@ public:
         std::cout << "]" << std::endl;
     }
 
+    void log_vector(const Eigen::VectorXf &vec,
+                    const std::string &src = "MAIN") {
+
+        std::cout << get_datetime() << " | " << src << " | [";
+        for (unsigned int i = 0; i < vec.size(); i++) {
+            std::cout << vec[i];
+            if (i != vec.size() - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << "]" << std::endl;
+    }
+
     template <std::size_t N>
     void log_arr_bool(const std::array<bool, N> &arr,
                       const std::string &src = "MAIN") {
@@ -70,7 +89,6 @@ public:
         std::cout << "]" << std::endl;
     }
 };
-
 
 
 
@@ -122,6 +140,11 @@ private:
 };
 
 
+/* MISCELLANEOUS */
+
+
+
+
 /* NAMESPACE */
 
 namespace utils {
@@ -138,15 +161,62 @@ int arr_argmax(std::array<float, N> arr) {
     return std::distance(arr.begin(), max_it);
 }
 
-inline Eigen::Vector2d generalized_sigmoid(Eigen::Vector2d x,
-                                         double offset = 1.0,
-                                         double gain = 1.0,
-                                         double clip = 1.0) {
-    Eigen::Vector2d offset_vec = Eigen::Vector2d::Constant(offset);
-    return (1.0 / (1.0 + (-gain * (x - offset_vec).array()).exp())).cwiseMin(clip);
+/* @brief: Generalized sigmoid function
+ * @param x: input vector
+ * @param offset: offset parameter
+ * @param gain: gain parameter
+ * @param clip: clip parameter
+ * @return: sigmoid output : Eigen::Vector2d
+ */
+inline Eigen::VectorXf generalized_sigmoid(const Eigen::VectorXf& x,
+                                           float offset = 1.0f,
+                                           float gain = 1.0f,
+                                           float clip = 1.0f) {
+    // Offset each element by `offset`, apply the gain, and then compute the sigmoid
+    std::cout << "offset " << offset << std::endl;
+    std::cout << "gain " << gain << std::endl;
+    std::cout << "clip " << clip << std::endl;
+    Eigen::VectorXf result = 1.0f / (1.0f + \
+        (-gain * (x.array() - offset)).exp());
+
+    return (result.array() >= clip).select(result, 0.0f);
+}
+/* inline Eigen::Vector2f generalized_sigmoid(Eigen::Vector2f x, */
+/*                                          double offset = 1.0, */
+/*                                          double gain = 1.0, */
+/*                                          double clip = 1.0) { */
+/*     Eigen::Vector2f offset_vec = Eigen::Vector2f::Constant(offset); */
+/*     return (1.0 / (1.0 + (-gain * (x - \ */
+/*             offset_vec).array()).exp())).cwiseMin(clip); */
+/* } */
+
+
+inline float cosine_similarity_vec(const Eigen::VectorXf& v1,
+                                   const Eigen::VectorXf& v2) {
+    return v1.dot(v2) / (v1.norm() * v2.norm());
 }
 
+inline Eigen::MatrixXf grahm_matrix(const Eigen::MatrixXf& X) {
+    return X * X.transpose();
+}
 
+/* @brief: fill a matrix with random values
+ * @param M: matrix to fill
+ * @param sparsity: sparsity of the matrix
+ */
+void fill_random(Eigen::MatrixXf &M, float sparsity = 0.0) {
+
+    // make random generator
+    RandomGenerator random = RandomGenerator();
+
+    for (int i = 0; i < M.rows(); i++) {
+        for (int j = 0; j < M.cols(); j++) {
+            if (random.get_random_float() > sparsity) {
+                M(i, j) = random.get_random_float();
+            }
+        }
+    }
+}
 
 // objects
 

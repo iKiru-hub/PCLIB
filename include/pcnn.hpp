@@ -6,93 +6,15 @@
 #include <array>
 
 
-#define LOG(msg) utils::logging.log(msg, "PCNN")
+#define LOG(msg) utils::logging.log(msg, "PCLIB")
 #define SPACE utils::logging.space
 
 
 /* PCNN */
 
-
-
-class pcNN {
-public:
-    pcNN(int N, double gain, double offset)
-        : N(N), gain_(gain), offset_(offset) {
-        W_ = Eigen::Matrix2d::Zero();
-        C_ = Eigen::Matrix2d::Zero();
-        mask_ = Eigen::Matrix2d::Zero();
-        u_ = Eigen::Vector2d::Zero();
-    }
-
-    Eigen::Vector2d call(const Eigen::Vector2d& x) {
-        u_ = utils::generalized_sigmoid(W_ * u_ + x, offset_, gain_, 0.01);
-        return u_;
-    }
-
-    // Getters
-    int get_N() const { return N; }
-    double get_gain() const { return gain_; }
-    double get_offset() const { return offset_; }
-    const Eigen::Matrix2d& get_W() const { return W_; }
-    const Eigen::Matrix2d& get_C() const { return C_; }
-    const Eigen::Matrix2d& get_mask() const { return mask_; }
-    const Eigen::Vector2d& get_u() const { return u_; }
-
-    // Setters
-    void set_W(const Eigen::Matrix2d& W) { W_ = W; }
-    void set_C(const Eigen::Matrix2d& C) { C_ = C; }
-    void set_mask(const Eigen::Matrix2d& mask) { mask_ = mask; }
-    void set_u(const Eigen::Vector2d& u) { u_ = u; }
-
-    // class representation
-    /* void print() { */
-    /*     std::cout << "pcNN(" << N << ", " << gain_ << ", " << offset_ << ")" << std::endl; */
-    /* } */
-
-private:
-    const int N;
-    const double gain_;
-    const double offset_;
-    Eigen::Matrix2d W_;
-    Eigen::Matrix2d C_;
-    Eigen::Matrix2d mask_;
-    Eigen::Vector2d u_;
-};
-
-
 class PCLayer {
 
 public:
-
-    /* @brief Call the PCLayer with a 2D input and compute
-     * the Gaussian distance to the centers
-     * @param x A 2D input to the PCLayer
-     */
-    Eigen::VectorXf call(const Eigen::Vector2f& x) {
-        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
-        for (int i = 0; i < N; i++) {
-            float dx = x(0) - centers(i, 0);
-            float dy = x(1) - centers(i, 1);
-            float dist_squared = std::pow(dx, 2) + std::pow(dy, 2);
-            y(i) = std::exp(-dist_squared / denom);
-        }
-
-        return y;
-    }
-
-    std::string str() {
-        return "PCLayer";
-    }
-
-    int len() {
-        return N;
-    }
-
-    std::string info() {
-        return "PCLayer(n=" + std::to_string(n) + \
-            ", sigma=" + std::to_string(sigma) + \
-            ", bounds=[" + std::to_string(bounds[0]);
-    }
 
     PCLayer(int n, float sigma,
             std::array<float, 4> bounds)
@@ -107,8 +29,30 @@ public:
         LOG("[+] PCLayer created");
     }
 
-    ~PCLayer() {
-        LOG("[-] PCLayer destroyed");
+    ~PCLayer() { LOG("[-] PCLayer destroyed"); }
+
+    /* @brief Call the PCLayer with a 2D input and compute
+     * the Gaussian distance to the centers
+     * @param x A 2D input to the PCLayer
+     */
+    Eigen::VectorXf call(const Eigen::Vector2f& x) {
+        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
+        for (int i = 0; i < N; i++) {
+            float dx = x(0) - centers(i, 0);
+            float dy = x(1) - centers(i, 1);
+            float dist_squared = std::pow(dx, 2) + \
+                std::pow(dy, 2);
+            y(i) = std::exp(-dist_squared / denom);
+        }
+        return y;
+    }
+
+    std::string str() { return "PCLayer"; }
+    int len() { return N; }
+    std::string repr() {
+        return "PCLayer(n=" + std::to_string(n) + \
+            ", sigma=" + std::to_string(sigma) + \
+            ", bounds=[" + std::to_string(bounds[0]);
     }
 
 private:
@@ -130,10 +74,142 @@ private:
         // Compute the centers
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
-                centers(i * n + j, 0) = bounds[0] + i * x_spacing;
-                centers(i * n + j, 1) = bounds[2] + j * y_spacing;
+                centers(i * n + j, 0) = bounds[0] + \
+                    i * x_spacing;
+                centers(i * n + j, 1) = bounds[2] + \
+                    j * y_spacing;
             }
         }
+    }
+
+};
+
+
+class PCNN {
+public:
+    PCNN(int N, int Nj, float gain, float offset,
+         float threshold, float rep_threshold,
+         float rec_threshold,
+         int num_neighbors, float trace_tau,
+         PCLayer xfilter, std::string name = "2D")
+        : N(N), Nj(Nj), gain(gain), offset(offset),
+        rep_threshold(rep_threshold),
+        rec_threshold(rec_threshold),
+        num_neighbors(num_neighbors), trace_tau(trace_tau),
+        xfilter(xfilter), name(name) {
+
+        // Initialize the variables
+        Wff = Eigen::MatrixXf::Zero(N, Nj);
+        Wffbackup = Eigen::MatrixXf::Zero(N, Nj);
+        Wrec = Eigen::MatrixXf::Zero(N, N);
+        C = Eigen::MatrixXf::Zero(N, N);
+        mask = Eigen::VectorXf::Zero(N);
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+        num_pc = 0;
+        free_indexes = Eigen::VectorXi::LinSpaced(N + 1, 0, N);
+
+        // make ff matrix random
+        utils::fill_random(Wff, 0.5);
+    }
+
+    Eigen::VectorXf call(const Eigen::Vector2f& x,
+                         const bool frozen = false) {
+
+        // pass the input through the filter layer
+        Eigen::VectorXf x_filtered = xfilter.call(x);
+
+        LOG("[+] PCNN.call");
+        utils::logging.log_vector(x_filtered);
+
+        // forward it to the network by doing a dot product
+        // with the feedforward weights
+        u = Wff * x_filtered + pre_x;
+
+        LOG("pre-activation");
+        utils::logging.log_vector(u);
+
+        u = utils::generalized_sigmoid(u, offset, gain, 0.01);
+
+        // update the trace
+        trace = (1 - trace_tau) * trace + trace_tau * u;
+
+        LOG("post-activation");
+        utils::logging.log_vector(u);
+
+        // update model
+        if (!frozen) {
+            update();
+        }
+
+        return u;
+    }
+
+    void reset() {
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+    }
+
+    // Getters
+    int len() const { return N; }
+    std::string str() const { return "PCNN." + name; }
+    std::string repr() const {
+        return "PCNN(" + name + std::to_string(N) + \
+            std::to_string(Nj) + std::to_string(gain) + \
+            std::to_string(offset) + \
+            std::to_string(rep_threshold) + \
+            std::to_string(rec_threshold) + \
+            std::to_string(num_neighbors) + \
+            std::to_string(trace_tau) + ")";
+    }
+    Eigen::VectorXf representation() const { return u; }
+
+private:
+    // parameters
+    const int N;
+    const int Nj;
+    const float gain;
+    const float offset;
+    const float threshold;
+    const float rep_threshold;
+    const float rec_threshold;
+    const int num_neighbors;
+    const float trace_tau;
+    const std::string name;
+
+    PCLayer xfilter;
+
+    // variables
+    Eigen::MatrixXf Wff;
+    Eigen::MatrixXf Wffbackup;
+    Eigen::MatrixXf Wrec;
+    Eigen::MatrixXf C;
+    Eigen::VectorXf mask;
+    Eigen::VectorXi learnt_indexes;
+    Eigen::VectorXi free_indexes;
+    int num_pc;
+    Eigen::VectorXf u;
+    Eigen::VectorXf trace;
+    Eigen::VectorXf pre_x;
+
+    void update() {}
+
+    // @brief Quantify the indexes
+    void quantify_indexes(float threshold = 0.99) {
+        // the learned indexes are the indexes of the
+        // neurons that have a sum of weights greater
+        // than 0.99.
+        // learnt: [i1, -1, i3, ...]
+        // free: [-1, i2, -1, ...]
+        for (int i = 0; i < N; i++) {
+            if (Wff.row(i).sum() > threshold) {
+                learnt_indexes.push_back(i);
+                free_indexes.erase(i);
+            }
+        }
+
     }
 
 };
@@ -143,15 +219,6 @@ private:
 // LEAKY VARIABLE
 class LeakyVariableND {
 public:
-    std::string name;
-
-    /* @brief Call the LeakyVariableND with a 2D input
-     * @param x A 2D input to the LeakyVariable */
-    void call(const Eigen::VectorXf& x) {
-
-        // Compute dv and update v
-        v += (Eigen::VectorXf::Constant(ndim, eq) - v) * tau + x;
-    }
 
     LeakyVariableND(std::string name, float eq, float tau,
                     size_t ndim)
@@ -164,23 +231,22 @@ public:
         LOG("[-] LeakyVariableND destroyed with name: " + name);
     }
 
-    Eigen::VectorXf get_v() const {
-        return v;
+    /* @brief Call the LeakyVariableND with a 2D input
+     * @param x A 2D input to the LeakyVariable */
+    void call(const Eigen::VectorXf& x) {
+
+        // Compute dv and update v
+        v += (Eigen::VectorXf::Constant(ndim, eq) - v) * tau + x;
     }
 
+
+    Eigen::VectorXf get_v() const { return v; }
     void print_v() const {
-        std::cout << "v: " << v.transpose() << std::endl;
-    }
+        std::cout << "v: " << v.transpose() << std::endl; }
+    std::string str() const { return "LeakyVariableND." + name; }
+    int len() const { return ndim; }
 
-    std::string str() const {
-        return "LeakyVariableND." + name;
-    }
-
-    int len() const {
-        return ndim;
-    }
-
-    void info() const {
+    void repr() const {
         LOG("LeakyVariableND." + name + "(eq=" +
             std::to_string(eq) +
             ", tau=" + std::to_string(tau) + ", ndim=" +
@@ -191,6 +257,7 @@ private:
     float eq;
     float tau;
     size_t ndim;
+    std::string name;
     Eigen::VectorXf v;
 };
 
@@ -221,19 +288,10 @@ public:
         LOG("[-] LeakyVariable1D destroyed with name: " + name);
     }
 
-    float get_v() {
-        return v;
-    }
-
-    std::string str() {
-        return "LeakyVariable." + name;
-    }
-
-    int len() {
-        return 1;
-    }
-
-    void info() {
+    float get_v() { return v; }
+    std::string str() { return "LeakyVariable." + name; }
+    int len() { return 1; }
+    void repr() {
         LOG("LeakyVariable." + name + "(eq=" + \
             std::to_string(eq) +
             ", tau=" + std::to_string(tau) + ")");
@@ -258,9 +316,7 @@ public:
         utils::logging.log("[+] SamplingModule");
     }
 
-    ~SamplingModule() {
-        utils::logging.log("[-] SamplingModule");
-    }
+    ~SamplingModule() { utils::logging.log("[-] SamplingModule"); }
 
     void call(bool keep = false) {
 
@@ -287,38 +343,16 @@ public:
         return;
     }
 
-    void update(float score) {
-        values[idx] = score;
-    }
-
-    bool is_done() {
-        return counter == num_samples;
-    }
-
-    std::string str() {
-        return "SamplingModule." + name;
-    }
-
-    int len() {
-        return num_samples;
-    }
-
-    std::array<float, 2> get_velocity() {
-        return velocity;
-    }
-
-    const int get_idx() {
-        return idx;
-    }
-
-    const int get_counter() {
-        return counter;
-    }
+    void update(float score) { values[idx] = score; }
+    bool is_done() { return counter == num_samples; }
+    std::string str() { return "SamplingModule." + name; }
+    int len() { return num_samples; }
+    std::array<float, 2> get_velocity() { return velocity; }
+    const int get_idx() { return idx; }
+    const int get_counter() { return counter; }
 
     const float get_max_value() {
-        if (counter == 0) {
-            return 0.0;
-        }
+        if (counter == 0) { return 0.0; }
         return values[idx];
     }
 
@@ -392,29 +426,29 @@ void test_layer() {
 
 };
 
+
 void testSampling() {
 
-    /* pcl::SamplingModule sm = pcl::SamplingModule(10); */
+    pcl::SamplingModule sm = pcl::SamplingModule(10);
 
-    /* sm.print(); */
+    sm.str();
 
-    /* bool keep = false; */
-    /* for (int i = 0; i < 28; i++) { */
-    /*     sm.call(keep); */
-    /*     if (!sm.is_done()) { */
-    /*         sm.update(utils::random.getRandomFloat()); */
-    /*     }; */
+    bool keep = false;
+    for (int i = 0; i < 28; i++) {
+        sm.call(keep);
+        if (!sm.is_done()) {
+            sm.update(utils::random.get_random_float());
+        };
 
-    /*     if (i == (sm.getSize() + 3)) { */
-    /*         LOG("resetting..."); */
-    /*         sm.reset(); */
-    /*     }; */
-    /* }; */
+        if (i == (sm.get_size() + 3)) {
+            LOG("resetting...");
+            sm.reset();
+        };
+    };
 };
 
 
-
-void testLeaky() {
+void test_leaky() {
 
     SPACE("#---#");
 
@@ -424,5 +458,33 @@ void testLeaky() {
     SPACE("#---#");
 }
 
+
+void test_pcnn() {
+
+    SPACE("#---#");
+
+    LOG("Testing PCNN...");
+
+    int n = 3;
+    int Nj = std::pow(n, 2);
+
+    PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0});
+    LOG(xfilter.str());
+
+    PCNN model = PCNN(3, Nj, 10., 0.5, 0.1,
+                      0.1, 8, 0.1, xfilter);
+
+    LOG(model.str());
+
+    Eigen::Vector2f x = {0.5, 0.5};
+    Eigen::VectorXf y = model.call(x);
+
+    LOG("output:");
+    utils::logging.log_vector(y);
+
+    LOG("");
+
+    SPACE("#---#");
+}
 
 };

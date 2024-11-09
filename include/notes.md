@@ -16,10 +16,15 @@ rand()
 
 # TODO
 
-[ ] sampling module
-[ ] leaky variable
+[x] sampling module
+[x] leaky variable
+[x] pc layer
 [ ] pcnn
 [ ] modulation
 [ ] circuit module
 [ ] experience module
 [ ] brain module
+
+
+
+

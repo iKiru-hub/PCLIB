@@ -7,29 +7,6 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(pclib, m) {
 
-    // PCNN
-    py::class_<pcNN>(m, "pcNN")
-        .def(py::init<int, double, double>(),
-             py::arg("N"),
-             py::arg("gain"),
-             py::arg("offset"))
-        .def("call", &pcNN::call)
-        .def_property_readonly("N", &pcNN::get_N)
-        .def_property_readonly("gain", &pcNN::get_gain)
-        .def_property_readonly("offset", &pcNN::get_offset)
-        .def_property("W",
-            &pcNN::get_W,
-            &pcNN::set_W)
-        .def_property("C",
-            &pcNN::get_C,
-            &pcNN::set_C)
-        .def_property("mask",
-            &pcNN::get_mask,
-            &pcNN::set_mask)
-        .def_property("u",
-            &pcNN::get_u,
-            &pcNN::set_u);
-
     // Sampling Module
     py::class_<SamplingModule>(m, "SamplingModule")
         .def(py::init<std::string, float>(),
@@ -55,7 +32,7 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("x") = 0.0)
         .def("__str__", &LeakyVariable1D::str)
         .def("__len__", &LeakyVariable1D::len)
-        .def("info", &LeakyVariable1D::info)
+        .def("__repr__", &LeakyVariable1D::repr)
         .def("get_v", &LeakyVariable1D::get_v);
 
     // LeakyVariable ND
@@ -70,7 +47,7 @@ PYBIND11_MODULE(pclib, m) {
         .def("__str__", &LeakyVariableND::str)
         .def("__len__", &LeakyVariableND::len)
         .def("print_v", &LeakyVariableND::print_v)
-        .def("info", &LeakyVariableND::info)
+        .def("__repr__", &LeakyVariableND::repr)
         .def("get_v", &LeakyVariableND::get_v);
 
     // (InputFilter) Place Cell Layer
@@ -83,5 +60,25 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("x"))
         .def("__str__", &PCLayer::str)
         .def("__len__", &PCLayer::len)
-        .def("info", &PCLayer::info);
+        .def("__repr__", &PCLayer::repr);
+
+    // PCNN network model
+    py::class_<PCNN>(m, "PCNN")
+        .def(py::init<int, int, float, float, float, float, \
+             int, float, PCLayer, std::string>(),
+             py::arg("N"),
+             py::arg("Nj"),
+             py::arg("gain"),
+             py::arg("offset"),
+             py::arg("rep_threshold"),
+             py::arg("rec_threshold"),
+             py::arg("num_neighbors"),
+             py::arg("trace_tau"),
+             py::arg("xfilter"),
+             py::arg("name"))
+        .def("__call__", &PCNN::call,
+             py::arg("x"))
+        .def("__str__", &PCNN::str)
+        .def("__len__", &PCNN::len)
+        .def("__repr__", &PCNN::repr);
 }
