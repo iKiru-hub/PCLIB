@@ -93,9 +93,11 @@ public:
          int num_neighbors, float trace_tau,
          PCLayer xfilter, std::string name = "2D")
         : N(N), Nj(Nj), gain(gain), offset(offset),
+        threshold(threshold),
         rep_threshold(rep_threshold),
         rec_threshold(rec_threshold),
-        num_neighbors(num_neighbors), trace_tau(trace_tau),
+        num_neighbors(num_neighbors),
+        trace_tau(trace_tau),
         xfilter(xfilter), name(name) {
 
         // Initialize the variables
@@ -107,11 +109,27 @@ public:
         u = Eigen::VectorXf::Zero(N);
         trace = Eigen::VectorXf::Zero(N);
         pre_x = Eigen::VectorXf::Zero(N);
-        num_pc = 0;
-        free_indexes = Eigen::VectorXi::LinSpaced(N + 1, 0, N);
+        cell_count = 0;
+
+        // make vector of free indexes
+        LOG("making free indexes, N: " + std::to_string(N));
+        for (int i = 0; i < N; i++) {
+            free_indexes.push_back(i);
+            LOG("free indexes: " + std::to_string(i));
+        }
+        fixed_indexes = {};
+
+        // print size of the free indexes
+        LOG("free indexes size: " + std::to_string(free_indexes.size()));
+        for (int i = 0; i < N; i++) {
+            LOG("free indexes: " + std::to_string(free_indexes[i]));
+        }
+        // print begin
+        LOG("beginning of free indexes: " + std::to_string(free_indexes[0]));
+        LOG("end of free indexes: " + std::to_string(free_indexes[N]));
 
         // make ff matrix random
-        utils::fill_random(Wff, 0.5);
+        /* utils::fill_random(Wff, 0.5); */
     }
 
     Eigen::VectorXf call(const Eigen::Vector2f& x,
@@ -140,7 +158,9 @@ public:
 
         // update model
         if (!frozen) {
-            update();
+            LOG("updating model...");
+            LOG("free indexes size: " + std::to_string(free_indexes.size()));
+            update(x_filtered);
         }
 
         return u;
@@ -153,7 +173,7 @@ public:
     }
 
     // Getters
-    int len() const { return N; }
+    int len() const { return cell_count; }
     std::string str() const { return "PCNN." + name; }
     std::string repr() const {
         return "PCNN(" + name + std::to_string(N) + \
@@ -187,26 +207,91 @@ private:
     Eigen::MatrixXf Wrec;
     Eigen::MatrixXf C;
     Eigen::VectorXf mask;
-    Eigen::VectorXi learnt_indexes;
-    Eigen::VectorXi free_indexes;
-    int num_pc;
+    std::vector<int> fixed_indexes;
+    std::vector<int> free_indexes;
+    int cell_count;
     Eigen::VectorXf u;
     Eigen::VectorXf trace;
     Eigen::VectorXf pre_x;
 
-    void update() {}
+    void update(Eigen::VectorXf& x) {
 
-    // @brief Quantify the indexes
-    void quantify_indexes(float threshold = 0.99) {
-        // the learned indexes are the indexes of the
-        // neurons that have a sum of weights greater
-        // than 0.99.
-        // learnt: [i1, -1, i3, ...]
-        // free: [-1, i2, -1, ...]
+        make_indexes();
+
+        // check if the fixed neurons are silent
+        if (check_fixed_indexes() != -1) {
+            LOG("--- fixed neurons are silent");
+           return void();
+        };
+
+        // check there are still free indexes
+        if (free_indexes.size() == 0) {
+            LOG("--- no free indexes");
+            return void();
+        };
+
+        // pick new index
+        int idx = utils::random.get_random_element_vec(
+                                        free_indexes);
+
+        // update weights
+        // Update weights
+        Eigen::VectorXf dw = x - Wff.row(idx).transpose();
+        Wff.row(idx) += dw.transpose();
+
+        if (dw.sum() > 0.0) {
+
+            // calculate the similarity among the rows
+            float similarity = utils::max_cosine_similarity_in_column(Wff, idx);
+
+            // check repulsion (similarity) level
+            if (similarity > rep_threshold) {
+                Wff.row(idx) = Wffbackup.row(idx);
+                LOG("--- repulsion level");
+                return void();
+            }
+
+            // proceed
+            cell_count++;
+            Wffbackup.row(idx) = Wff.row(idx);
+        }
+
+    }
+
+    // @brief check if one of the fixed neurons
+    int check_fixed_indexes() {
+
+        // if there are no fixed neurons, return -1
+        if (fixed_indexes.size() == 0) {
+            return -1;
+        };
+
+        // loop through the fixed indexes's `u` value
+        int max_idx = -1;
+        float max_u = 0.0;
+        for (int i = 0; i < fixed_indexes.size(); i++) {
+            if (u(fixed_indexes[i]) > max_u) {
+                max_u = u(fixed_indexes[i]);
+                max_idx = fixed_indexes[i];
+            };
+        };
+
+        if (max_u < threshold) { return -1; }
+        else { return max_idx; };
+    }
+
+    // @brief Quantify the indexes.
+    void make_indexes() {
+
+        free_indexes.clear();
         for (int i = 0; i < N; i++) {
             if (Wff.row(i).sum() > threshold) {
-                learnt_indexes.push_back(i);
-                free_indexes.erase(i);
+                fixed_indexes.push_back(i);
+                LOG("value: " + std::to_string(Wff.row(i).sum()) + \
+                    " threshold: " + std::to_string(threshold) + \
+                    " fixed indexes size: " + std::to_string(fixed_indexes.size()));
+            } else {
+                free_indexes.push_back(i);
             }
         }
 
@@ -429,7 +514,7 @@ void test_layer() {
 
 void testSampling() {
 
-    pcl::SamplingModule sm = pcl::SamplingModule(10);
+    SamplingModule sm = SamplingModule("Test", 10);
 
     sm.str();
 
@@ -440,7 +525,7 @@ void testSampling() {
             sm.update(utils::random.get_random_float());
         };
 
-        if (i == (sm.get_size() + 3)) {
+        if (i == (sm.len() + 3)) {
             LOG("resetting...");
             sm.reset();
         };
@@ -471,8 +556,8 @@ void test_pcnn() {
     PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0});
     LOG(xfilter.str());
 
-    PCNN model = PCNN(3, Nj, 10., 0.5, 0.1,
-                      0.1, 8, 0.1, xfilter);
+    PCNN model = PCNN(3, Nj, 10., 0.5, 0.1, 0.1,
+                      0.1, 8, 0.1, xfilter, "2D");
 
     LOG(model.str());
 
@@ -483,6 +568,12 @@ void test_pcnn() {
     utils::logging.log_vector(y);
 
     LOG("");
+    LOG("model length: " + std::to_string(model.len()));
+
+    x = {0.1, 0.1};
+    y = model.call(x);
+    LOG("model length 2: " + std::to_string(model.len()));
+
 
     SPACE("#---#");
 }

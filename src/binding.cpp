@@ -64,12 +64,13 @@ PYBIND11_MODULE(pclib, m) {
 
     // PCNN network model
     py::class_<PCNN>(m, "PCNN")
-        .def(py::init<int, int, float, float, float, float, \
+        .def(py::init<int, int, float, float, float, float, float, \
              int, float, PCLayer, std::string>(),
              py::arg("N"),
              py::arg("Nj"),
              py::arg("gain"),
              py::arg("offset"),
+             py::arg("threshold"),
              py::arg("rep_threshold"),
              py::arg("rec_threshold"),
              py::arg("num_neighbors"),
@@ -77,7 +78,8 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("xfilter"),
              py::arg("name"))
         .def("__call__", &PCNN::call,
-             py::arg("x"))
+             py::arg("x"),
+             py::arg("frozen") = false)
         .def("__str__", &PCNN::str)
         .def("__len__", &PCNN::len)
         .def("__repr__", &PCNN::repr);

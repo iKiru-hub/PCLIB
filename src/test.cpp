@@ -18,6 +18,8 @@ int main() {
     /* testLeaky(); */
     /* pcl::test_layer(); */
     pcl::test_pcnn();
+    /* utils::test_random_1(); */
+    /* utils::test_max_cosine(); */
 
     return 0;
 }
