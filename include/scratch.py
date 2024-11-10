@@ -784,3 +784,60 @@ class PCNN():
             self._Wff = np.zeros((self.N, self.Nj))
             self._Wrec = np.zeros((self.N, self.N))
 
+
+
+
+
+def calc_weight_connectivity(M: np.ndarray,
+                             threshold: float=0.5,
+                             triangular: bool=False) -> np.ndarray:
+    """
+    calculate the connectivity of the weights
+    ---
+    >>> TODO <<<
+    consider using the `cosine_similarity` function below
+    """
+
+    # Manually compute the norm along axis 1
+    norm_M = np.sqrt((M ** 2).sum(axis=1))
+
+    # Compute the cosine similarity
+    cosine_sim = (M @ M.T) / (norm_M[:, None] * norm_M[None, :])
+
+    # make it lower triangular
+    if triangular:
+        cosine_sim *= np.tril(np.ones_like(cosine_sim), k=-1)
+
+    # Set the diagonal to zero
+    cosine_sim = np.where(np.isnan(cosine_sim), 0., cosine_sim)
+
+    cosine_sim *= 1 - np.eye(cosine_sim.shape[0])
+    return np.where(cosine_sim > (1-threshold), cosine_sim, 0.)
+
+
+def k_most_neighbors(M: np.ndarray, k: int):
+
+    """
+    set at most k neighbors for each tuned neuron
+    """
+
+    # Get the absolute values of the matrix
+    abs_matrix = np.abs(M)
+
+    # Sort indices of each row based on the absolute values
+    sorted_indices = np.argsort(abs_matrix, axis=1)
+
+    # Create a mask to zero out elements
+    mask = np.ones(M.shape, dtype=bool)
+
+    # For each row, set the smallest elements to zero
+    # if the count exceeds k
+    for i in range(M.shape[0]):
+        if np.count_nonzero(M[i]) > k:
+            mask[i, sorted_indices[i, :-k]] = False
+
+    # Apply the mask to the original matrix
+    M[~mask] = 0
+
+    return M
+

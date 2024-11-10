@@ -49,6 +49,7 @@ public:
 
     std::string str() { return "PCLayer"; }
     int len() { return N; }
+    Eigen::MatrixXf get_centers() { return centers; }
     std::string repr() {
         return "PCLayer(n=" + std::to_string(n) + \
             ", sigma=" + std::to_string(sigma) + \
@@ -108,28 +109,16 @@ public:
         mask = Eigen::VectorXf::Zero(N);
         u = Eigen::VectorXf::Zero(N);
         trace = Eigen::VectorXf::Zero(N);
+        delta_wff = 0.0;
         pre_x = Eigen::VectorXf::Zero(N);
         cell_count = 0;
 
         // make vector of free indexes
-        LOG("making free indexes, N: " + std::to_string(N));
         for (int i = 0; i < N; i++) {
             free_indexes.push_back(i);
             LOG("free indexes: " + std::to_string(i));
         }
         fixed_indexes = {};
-
-        // print size of the free indexes
-        LOG("free indexes size: " + std::to_string(free_indexes.size()));
-        for (int i = 0; i < N; i++) {
-            LOG("free indexes: " + std::to_string(free_indexes[i]));
-        }
-        // print begin
-        LOG("beginning of free indexes: " + std::to_string(free_indexes[0]));
-        LOG("end of free indexes: " + std::to_string(free_indexes[N]));
-
-        // make ff matrix random
-        /* utils::fill_random(Wff, 0.5); */
     }
 
     Eigen::VectorXf call(const Eigen::Vector2f& x,
@@ -138,14 +127,12 @@ public:
         // pass the input through the filter layer
         Eigen::VectorXf x_filtered = xfilter.call(x);
 
-        LOG("[+] PCNN.call");
         utils::logging.log_vector(x_filtered);
 
         // forward it to the network by doing a dot product
         // with the feedforward weights
         u = Wff * x_filtered + pre_x;
 
-        LOG("pre-activation");
         utils::logging.log_vector(u);
 
         u = utils::generalized_sigmoid(u, offset, gain, 0.01);
@@ -153,13 +140,8 @@ public:
         // update the trace
         trace = (1 - trace_tau) * trace + trace_tau * u;
 
-        LOG("post-activation");
-        utils::logging.log_vector(u);
-
         // update model
         if (!frozen) {
-            LOG("updating model...");
-            LOG("free indexes size: " + std::to_string(free_indexes.size()));
             update(x_filtered);
         }
 
@@ -204,8 +186,10 @@ private:
     // variables
     Eigen::MatrixXf Wff;
     Eigen::MatrixXf Wffbackup;
+    float delta_wff;
     Eigen::MatrixXf Wrec;
     Eigen::MatrixXf C;
+    Eigen::MatrixXf centers;
     Eigen::VectorXf mask;
     std::vector<int> fixed_indexes;
     std::vector<int> free_indexes;
@@ -220,13 +204,11 @@ private:
 
         // check if the fixed neurons are silent
         if (check_fixed_indexes() != -1) {
-            LOG("--- fixed neurons are silent");
            return void();
         };
 
         // check there are still free indexes
         if (free_indexes.size() == 0) {
-            LOG("--- no free indexes");
             return void();
         };
 
@@ -234,26 +216,36 @@ private:
         int idx = utils::random.get_random_element_vec(
                                         free_indexes);
 
-        // update weights
-        // Update weights
+        // determine weight update
         Eigen::VectorXf dw = x - Wff.row(idx).transpose();
-        Wff.row(idx) += dw.transpose();
+        delta_wff = dw.norm();
 
-        if (dw.sum() > 0.0) {
+        if (delta_wff > 0.0) {
+
+            // update weights
+            Wff.row(idx) += dw.transpose();
 
             // calculate the similarity among the rows
-            float similarity = utils::max_cosine_similarity_in_column(Wff, idx);
+            float similarity = \
+                utils::max_cosine_similarity_in_column(
+                    Wff, idx);
 
             // check repulsion (similarity) level
             if (similarity > rep_threshold) {
                 Wff.row(idx) = Wffbackup.row(idx);
-                LOG("--- repulsion level");
                 return void();
             }
 
-            // proceed
+            // update count and backup
             cell_count++;
             Wffbackup.row(idx) = Wff.row(idx);
+
+            // update recurrent connections
+            update_recurrent();
+
+            // make centers
+            centers = utils::calc_centers_from_layer(
+                Wff, xfilter.get_centers());
         }
 
     }
@@ -287,14 +279,24 @@ private:
         for (int i = 0; i < N; i++) {
             if (Wff.row(i).sum() > threshold) {
                 fixed_indexes.push_back(i);
-                LOG("value: " + std::to_string(Wff.row(i).sum()) + \
-                    " threshold: " + std::to_string(threshold) + \
-                    " fixed indexes size: " + std::to_string(fixed_indexes.size()));
             } else {
                 free_indexes.push_back(i);
             }
         }
+    }
 
+    // @brief calculate the recurrent connections
+    void update_recurrent() {
+        // connectivity matrix
+        C = utils::connectivity_matrix(
+            Wff, rec_threshold
+        );
+
+        // similarity
+        Wrec = utils::cosine_similarity_matrix(Wff);
+
+        // weights
+        Wrec = Wrec.cwiseProduct(C);
     }
 
 };

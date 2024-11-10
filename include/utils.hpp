@@ -260,9 +260,134 @@ float max_cosine_similarity_in_column(
     return max_similarity;
 }
 
-// @brief calculation of the row to row similarity matrix
-inline Eigen::MatrixXf grahm_matrix(const Eigen::MatrixXf& X) {
-    return X * X.transpose();
+// @brief calculate the connectivity given a matrix
+Eigen::MatrixXf connectivity_matrix(
+    const Eigen::MatrixXf& matrix,
+    float threshold = 0.5f) {
+
+    // Compute the row to row similarity matrix
+    Eigen::MatrixXf similarity_matrix = \
+        cosine_similarity_matrix(matrix);
+
+    // Threshold the similarity matrix
+    Eigen::MatrixXf connectivity = (similarity_matrix.array() \
+        > threshold).cast<float>();
+
+    return connectivity;
+}
+
+// @brief: given a connectivity matrix, ensure that each
+// row has at most k connections (chosen as the k most)
+// similar elements in the row
+Eigen::MatrixXf k_highest_neighbors(
+    Eigen::MatrixXf& connectivity, int k) {
+
+    // Check that k is within bounds
+    if (k < 0 || k >= connectivity.cols()) {
+        throw std::out_of_range("k is out of bounds.");
+    }
+
+    // Initialize the result matrix with zeros
+    Eigen::MatrixXf result = Eigen::MatrixXf::Zero(
+        connectivity.rows(), connectivity.cols());
+
+    // Iterate over each row
+    for (int i = 0; i < connectivity.rows(); i++) {
+        // Get the row of the connectivity matrix
+        Eigen::VectorXf row = connectivity.row(i);
+
+        // Store indices and values
+        std::vector<std::pair<float, int>> value_index_pairs;
+        for (int j = 0; j < row.size(); j++) {
+            value_index_pairs.emplace_back(row(j), j);
+        }
+
+        // Sort pairs based on values in descending order
+        std::partial_sort(
+            value_index_pairs.begin(),
+            value_index_pairs.begin() + k,
+            value_index_pairs.end(),
+            [](const std::pair<float, int>& a, const std::pair<float, int>& b) {
+                return a.first > b.first;
+            });
+
+        // Set the top-k indices in the result matrix to 1
+        for (int j = 0; j < k; j++) {
+            int idx = value_index_pairs[j].second;
+            result(i, idx) = 1;
+        }
+    }
+
+    return result;
+}
+
+// @brief: given a weight matrix and a set of centers,
+// calculate the new centers based on the weighted
+// average of the inputs
+Eigen::MatrixXf calc_centers_from_layer(
+    const Eigen::MatrixXf& wff,
+    const Eigen::MatrixXf& centers) {
+
+    // Initialize vectors for the centers' x and y coordinates
+    Eigen::VectorXf X = centers.col(0);
+    Eigen::VectorXf Y = centers.col(1);
+
+    // Calculate the weighted averages along each axis
+    Eigen::VectorXf wff_sum = wff.rowwise().sum();
+    Eigen::VectorXf x = (wff * X).cwiseQuotient(wff_sum);
+    Eigen::VectorXf y = (wff * Y).cwiseQuotient(wff_sum);
+
+    // Replace NaN values with -inf
+    for (int i = 0; i < x.size(); ++i) {
+        if (std::isnan(x(i))) x(i) = \
+            -std::numeric_limits<float>::infinity();
+        if (std::isnan(y(i))) y(i) = \
+            -std::numeric_limits<float>::infinity();
+    }
+
+    // Combine x and y into a matrix with two columns
+    Eigen::MatrixXf result(x.size(), 2);
+    result.col(0) = x;
+    result.col(1) = y;
+
+    return result;
+}
+
+// @brief: calculate a position given an activity vector,
+// a list of associated centers, and their indexes
+
+Eigen::Vector2f calculate_position(
+    const Eigen::VectorXf& a, const Eigen::MatrixXf& centers,
+    const Eigen::VectorXf& indexes)
+{
+    // Handle the case where the sum of activities is zero
+    if (a.sum() == 0.0f) {
+        return Eigen::Vector2f(-1.0f, -1.0f);
+    }
+
+    // Collect selected centers and activities based on indexes
+    Eigen::MatrixXf selected_centers(indexes.size(),
+                                     centers.cols());
+    Eigen::VectorXf selected_activities(indexes.size());
+
+    for (int i = 0; i < indexes.size(); ++i) {
+        int idx = static_cast<int>(indexes(i));
+        selected_centers.row(i) = centers.row(idx);
+        selected_activities(i) = a(idx);
+    }
+
+    // Calculate the position as the weighted sum
+    // of selected centers
+    float activity_sum = selected_activities.sum();
+    if (activity_sum == 0.0f) {
+        // Avoid divide-by-zero
+        return Eigen::Vector2f(-1.0f, -1.0f);
+    }
+
+    Eigen::Vector2f position = \
+        (selected_centers.transpose() * \
+        selected_activities) / activity_sum;
+    return position;
 }
 
 /* @brief: fill a matrix with random values
@@ -324,6 +449,60 @@ void test_max_cosine() {
     for (int i = 0; i < similarity_matrix.rows(); i++) {
         logging.log_vector(similarity_matrix.row(i));
     }
+}
+
+
+void test_connectivity() {
+
+    Eigen::MatrixXf matrix(4, 4);
+    matrix << 1, 0, 0, 0,
+              1, 0, 1, 0,
+              0, 1, 0, 0,
+              1, 1, 0, 1;
+
+    Eigen::MatrixXf connectivity = connectivity_matrix(matrix,
+                                                       0.01f);
+
+    Eigen::MatrixXf similarity_matrix = \
+        cosine_similarity_matrix(matrix);
+
+    // element-wise product with the connectivity matrix
+     Eigen::MatrixXf weights = \
+        similarity_matrix.cwiseProduct(connectivity);
+
+    logging.log("weights matrix:");
+    for (int i = 0; i < weights.rows(); i++) {
+        logging.log_vector(weights.row(i));
+    };
+
+    Eigen::MatrixXf k_neighbors = k_highest_neighbors(weights,
+                                                      2);
+
+    logging.log("k neighbors:");
+    for (int i = 0; i < k_neighbors.rows(); i++) {
+        logging.log_vector(k_neighbors.row(i));
+    }
+}
+
+
+void test_make_position() {
+
+    Eigen::VectorXf a = Eigen::VectorXf::Zero(4);
+    a << 0.0, 0.5, 0.0, 1.0;
+
+    Eigen::MatrixXf centers(4, 2);
+    centers << 0.0, 0.0,
+               1.0, 1.0,
+               2.0, 2.0,
+               3.0, 3.0;
+
+    Eigen::VectorXf indexes = Eigen::VectorXf::Zero(3);
+    indexes << 0, 1, 2;
+
+    Eigen::Vector2f position = calculate_position(a, centers, indexes);
+
+    logging.log("Position: ");
+    logging.log_vector(position);
 }
 
 }
