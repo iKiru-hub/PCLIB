@@ -17,11 +17,11 @@ int main() {
     /* testSampling(); */
     /* testLeaky(); */
     /* pcl::test_layer(); */
-    /* pcl::test_pcnn(); */
+    pcl::test_pcnn();
     /* utils::test_random_1(); */
     /* /1* utils::test_max_cosine(); *1/ */
     /* utils::test_connectivity(); */
-    utils::test_make_position();
+    /* utils::test_make_position(); */
 
     return 0;
 }

@@ -7,6 +7,10 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(pclib, m) {
 
+    // function `set_debug`
+    m.def("set_debug", &set_debug,
+          py::arg("flag"));
+
     // Sampling Module
     py::class_<SamplingModule>(m, "SamplingModule")
         .def(py::init<std::string, float>(),
@@ -64,12 +68,14 @@ PYBIND11_MODULE(pclib, m) {
 
     // PCNN network model
     py::class_<PCNN>(m, "PCNN")
-        .def(py::init<int, int, float, float, float, float, float, \
+        .def(py::init<int, int, float, float,
+             float, float, float, float, \
              int, float, PCLayer, std::string>(),
              py::arg("N"),
              py::arg("Nj"),
              py::arg("gain"),
              py::arg("offset"),
+             py::arg("clip_min"),
              py::arg("threshold"),
              py::arg("rep_threshold"),
              py::arg("rec_threshold"),
@@ -79,8 +85,18 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("name"))
         .def("__call__", &PCNN::call,
              py::arg("x"),
-             py::arg("frozen") = false)
+             py::arg("frozen") = false,
+             py::arg("traced") = true)
         .def("__str__", &PCNN::str)
         .def("__len__", &PCNN::len)
-        .def("__repr__", &PCNN::repr);
+        .def("__repr__", &PCNN::repr)
+        .def("get_size", &PCNN::get_size)
+        .def("get_trace", &PCNN::get_trace)
+        .def("get_wff", &PCNN::get_wff)
+        .def("get_wrec", &PCNN::get_wrec)
+        .def("get_connectivity", &PCNN::get_connectivity)
+        .def("fwd_ext", &PCNN::fwd_ext,
+             py::arg("x"))
+        .def("fwd_int", &PCNN::fwd_int,
+             py::arg("a"));
 }

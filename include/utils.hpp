@@ -76,6 +76,23 @@ public:
         std::cout << "]" << std::endl;
     }
 
+    void log_matrix(const Eigen::MatrixXf &mat,
+                    const std::string &src = "MAIN") {
+
+        std::cout << get_datetime() << " | " << src << " | " << std::endl;
+
+        for (int i = 0; i < mat.rows(); i++) {
+            std::cout << "[";
+            for (int j = 0; j < mat.cols(); j++) {
+                std::cout << mat(i, j);
+                if (j != mat.cols() - 1) {
+                    std::cout << ", ";
+                }
+            }
+            std::cout << "]" << std::endl;
+        }
+    }
+
     template <std::size_t N>
     void log_arr_bool(const std::array<bool, N> &arr,
                       const std::string &src = "MAIN") {
@@ -206,9 +223,6 @@ inline Eigen::VectorXf generalized_sigmoid(
     float clip = 1.0f) {
     // Offset each element by `offset`, apply the gain,
     // and then compute the sigmoid
-    std::cout << "offset " << offset << std::endl;
-    std::cout << "gain " << gain << std::endl;
-    std::cout << "clip " << clip << std::endl;
     Eigen::VectorXf result = 1.0f / (1.0f + \
         (-gain * (x.array() - offset)).exp());
 
@@ -231,6 +245,10 @@ Eigen::MatrixXf cosine_similarity_matrix(
     // Normalize each row to unit norm
     Eigen::MatrixXf normalized_matrix = matrix.rowwise().normalized();
 
+    // set NaN values to zero
+    normalized_matrix = (normalized_matrix.array().isNaN()).select(
+        Eigen::MatrixXf::Zero(n, n), normalized_matrix);
+
     // Compute the cosine similarity (normalized dot product)
     similarity_matrix = normalized_matrix * normalized_matrix.transpose();
 
@@ -240,18 +258,18 @@ Eigen::MatrixXf cosine_similarity_matrix(
     return similarity_matrix;
 }
 
-// @brief: calculate the maximum cosine similarity in a column
-float max_cosine_similarity_in_column(
+// @brief: calculate the maximum cosine similarity in a rows
+float max_cosine_similarity_in_rows(
     const Eigen::MatrixXf& matrix, int idx) {
     // Compute the cosine similarity matrix
     Eigen::MatrixXf similarity_matrix = cosine_similarity_matrix(matrix);
 
     // Check that idx is within bounds
-    if (idx < 0 || idx >= similarity_matrix.cols()) {
+    if (idx < 0 || idx >= similarity_matrix.rows()) {
         throw std::out_of_range("Index is out of bounds.");
     }
 
-    // Get the column at the specified index
+    // Get the row at the specified index
     Eigen::VectorXf column = similarity_matrix.col(idx);
 
     // Find the maximum value in the column
@@ -428,6 +446,7 @@ void test_random_1() {
     logging.log("Hello, this is: " + std::to_string(val));
 }
 
+
 void test_max_cosine() {
     Eigen::MatrixXf matrix(3, 3);
     matrix << 1, 0, 0,
@@ -441,7 +460,7 @@ void test_max_cosine() {
     }
 
     Eigen::MatrixXf similarity_matrix = cosine_similarity_matrix(matrix);
-    float max_sim = max_cosine_similarity_in_column(matrix, 0);
+    float max_sim = max_cosine_similarity_in_rows(matrix, 0);
     logging.log("Max cosine similarity: " + std::to_string(max_sim));
 
     // Print the similarity matrix

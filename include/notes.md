@@ -19,7 +19,7 @@ rand()
 [x] sampling module
 [x] leaky variable
 [x] pc layer
-[ ] pcnn
+[x] pcnn
 [ ] modulation
 [ ] circuit module
 [ ] experience module

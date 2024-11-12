@@ -31,7 +31,6 @@ def test_sampling():
     assert sm.get_counter() == 3, "Counter isn't working correctly"
 
 
-
 def test_leaky1D():
 
     """
@@ -114,10 +113,10 @@ def test_pclayer():
         f" correct {len(y)}"
 
 
-def test_pcnn():
+def test_pcnn_basics():
 
     """
-    test the PCNN network model
+    test the PCNN network model initialization and call
     """
 
     n = 3
@@ -128,19 +127,52 @@ def test_pcnn():
 
     # definition
     pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=0.1, offset=0.1,
+                      clip_min=0.01, threshold=0.1,
                       rep_threshold=0.1, rec_threshold=0.1,
                       num_neighbors=8, trace_tau=0.1,
                       xfilter=xfilter, name="2D")
-
-    assert len(pcnn) == Ni, f"Number of neurons is not " + \
+    assert pcnn.get_size() == Ni, f"Number of neurons is not " + \
         f"correct {len(pcnn)}"
 
     # check call
     x = np.array([0.5, 0.5])
     y = pcnn(x)
-
     assert len(y) == Ni, f"Output of the network is not" + \
         f" correct {len(y)}"
+
+
+def test_pcnn_plasticity():
+
+    """
+    test the PCNN network model learning
+    """
+
+    n = 3
+    Ni = 10
+    sigma = 0.1
+    bounds = np.array([0., 1., 0., 1.])
+    xfilter = pclib.PCLayer(n, sigma, bounds)
+
+    # definition
+    pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=10, offset=0.5,
+                      clip_min=0.09, threshold=0.6,
+                      rep_threshold=0.1, rec_threshold=0.01,
+                      num_neighbors=8, trace_tau=0.1,
+                      xfilter=xfilter, name="2D")
+
+    # check learning
+    x = np.array([0.5, 0.5])
+    _ = pcnn(x)
+    assert len(pcnn) == 1, f"Wrong number of learned pc, given {len(pcnn)}" + \
+        f" expected 1"
+
+    # check recurrent connectivity
+    x = np.array([0.45, 0.7])
+    _ = pcnn(x)
+    connectivity = pcnn.get_connectivity()
+    assert connectivity.sum() == 2, f"Recurrent connectivity is not " + \
+        f"correct {connectivity.sum()}"
+
 
 
 if __name__ == "__main__":

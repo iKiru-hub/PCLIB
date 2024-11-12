@@ -10,6 +10,21 @@
 #define SPACE utils::logging.space
 
 
+// DEBUGGING logs
+
+bool DEBUGGING = false;
+
+void set_debug(bool flag) {
+    DEBUGGING = flag;
+}
+
+void DEBUG(const std::string& msg) {
+    if (DEBUGGING) {
+        std::cout << "[DEBUG] " << msg << std::endl;
+    }
+}
+
+
 /* PCNN */
 
 class PCLayer {
@@ -89,12 +104,13 @@ private:
 class PCNN {
 public:
     PCNN(int N, int Nj, float gain, float offset,
-         float threshold, float rep_threshold,
+         float clip_min, float threshold,
+         float rep_threshold,
          float rec_threshold,
          int num_neighbors, float trace_tau,
          PCLayer xfilter, std::string name = "2D")
         : N(N), Nj(Nj), gain(gain), offset(offset),
-        threshold(threshold),
+        clip_min(clip_min), threshold(threshold),
         rep_threshold(rep_threshold),
         rec_threshold(rec_threshold),
         num_neighbors(num_neighbors),
@@ -105,40 +121,39 @@ public:
         Wff = Eigen::MatrixXf::Zero(N, Nj);
         Wffbackup = Eigen::MatrixXf::Zero(N, Nj);
         Wrec = Eigen::MatrixXf::Zero(N, N);
-        C = Eigen::MatrixXf::Zero(N, N);
+        connectivity = Eigen::MatrixXf::Zero(N, N);
         mask = Eigen::VectorXf::Zero(N);
         u = Eigen::VectorXf::Zero(N);
         trace = Eigen::VectorXf::Zero(N);
         delta_wff = 0.0;
+        x_filtered = Eigen::VectorXf::Zero(N);
         pre_x = Eigen::VectorXf::Zero(N);
         cell_count = 0;
 
         // make vector of free indexes
         for (int i = 0; i < N; i++) {
             free_indexes.push_back(i);
-            LOG("free indexes: " + std::to_string(i));
         }
         fixed_indexes = {};
     }
 
     Eigen::VectorXf call(const Eigen::Vector2f& x,
-                         const bool frozen = false) {
+                         const bool frozen = false,
+                         const bool traced = true) {
 
         // pass the input through the filter layer
-        Eigen::VectorXf x_filtered = xfilter.call(x);
-
-        utils::logging.log_vector(x_filtered);
+        x_filtered = xfilter.call(x);
 
         // forward it to the network by doing a dot product
         // with the feedforward weights
         u = Wff * x_filtered + pre_x;
 
-        utils::logging.log_vector(u);
-
-        u = utils::generalized_sigmoid(u, offset, gain, 0.01);
+        u = utils::generalized_sigmoid(u, offset, gain, clip_min);
 
         // update the trace
-        trace = (1 - trace_tau) * trace + trace_tau * u;
+        if (traced) {
+            trace = (1 - trace_tau) * trace + trace_tau * u;
+        }
 
         // update model
         if (!frozen) {
@@ -146,6 +161,14 @@ public:
         }
 
         return u;
+    }
+
+   Eigen::VectorXf fwd_ext(const Eigen::Vector2f& x) {
+        return call(x, true, false);
+    }
+
+   Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
+        return Wrec * a + pre_x;
     }
 
     void reset() {
@@ -156,6 +179,7 @@ public:
 
     // Getters
     int len() const { return cell_count; }
+    int get_size() const { return N; }
     std::string str() const { return "PCNN." + name; }
     std::string repr() const {
         return "PCNN(" + name + std::to_string(N) + \
@@ -167,6 +191,11 @@ public:
             std::to_string(trace_tau) + ")";
     }
     Eigen::VectorXf representation() const { return u; }
+    Eigen::MatrixXf get_wff() const { return Wff; }
+    Eigen::MatrixXf get_wrec() const { return Wrec; }
+    Eigen::MatrixXf get_connectivity() const { return connectivity; }
+    Eigen::VectorXf get_trace() const { return trace; }
+
 
 private:
     // parameters
@@ -174,6 +203,7 @@ private:
     const int Nj;
     const float gain;
     const float offset;
+    const float clip_min;
     const float threshold;
     const float rep_threshold;
     const float rec_threshold;
@@ -188,13 +218,14 @@ private:
     Eigen::MatrixXf Wffbackup;
     float delta_wff;
     Eigen::MatrixXf Wrec;
-    Eigen::MatrixXf C;
+    Eigen::MatrixXf connectivity;
     Eigen::MatrixXf centers;
     Eigen::VectorXf mask;
     std::vector<int> fixed_indexes;
     std::vector<int> free_indexes;
     int cell_count;
     Eigen::VectorXf u;
+    Eigen::VectorXf x_filtered;
     Eigen::VectorXf trace;
     Eigen::VectorXf pre_x;
 
@@ -202,19 +233,22 @@ private:
 
         make_indexes();
 
-        // check if the fixed neurons are silent
+        // exit: a fixed neuron is above threshold
         if (check_fixed_indexes() != -1) {
+            DEBUG("!Fixed index above threshold");
            return void();
         };
 
-        // check there are still free indexes
+        // exit: there are no free neurons
         if (free_indexes.size() == 0) {
+            DEBUG("!No free neurons");
             return void();
         };
 
         // pick new index
         int idx = utils::random.get_random_element_vec(
                                         free_indexes);
+        DEBUG("Picked index: " + std::to_string(idx));
 
         // determine weight update
         Eigen::VectorXf dw = x - Wff.row(idx).transpose();
@@ -222,12 +256,14 @@ private:
 
         if (delta_wff > 0.0) {
 
+            DEBUG("delta_wff: " + std::to_string(delta_wff));
+
             // update weights
             Wff.row(idx) += dw.transpose();
 
             // calculate the similarity among the rows
             float similarity = \
-                utils::max_cosine_similarity_in_column(
+                utils::max_cosine_similarity_in_rows(
                     Wff, idx);
 
             // check repulsion (similarity) level
@@ -259,6 +295,7 @@ private:
         };
 
         // loop through the fixed indexes's `u` value
+        // and return the index with the highest value
         int max_idx = -1;
         float max_u = 0.0;
         for (int i = 0; i < fixed_indexes.size(); i++) {
@@ -269,7 +306,11 @@ private:
         };
 
         if (max_u < threshold) { return -1; }
-        else { return max_idx; };
+        else {
+            DEBUG("Fixed index above threshold: " + \
+                std::to_string(max_u) + \
+                " [" + std::to_string(threshold) + "]");
+            return max_idx; };
     }
 
     // @brief Quantify the indexes.
@@ -288,7 +329,7 @@ private:
     // @brief calculate the recurrent connections
     void update_recurrent() {
         // connectivity matrix
-        C = utils::connectivity_matrix(
+        connectivity = utils::connectivity_matrix(
             Wff, rec_threshold
         );
 
@@ -296,7 +337,7 @@ private:
         Wrec = utils::cosine_similarity_matrix(Wff);
 
         // weights
-        Wrec = Wrec.cwiseProduct(C);
+        Wrec = Wrec.cwiseProduct(connectivity);
     }
 
 };
@@ -558,24 +599,29 @@ void test_pcnn() {
     PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0});
     LOG(xfilter.str());
 
-    PCNN model = PCNN(3, Nj, 10., 0.5, 0.1, 0.1,
-                      0.1, 8, 0.1, xfilter, "2D");
+    PCNN model = PCNN(3, Nj, 10., 0.1, 0.4, 0.01, 0.1,
+                      0.5, 8, 0.1, xfilter, "2D");
 
     LOG(model.str());
 
-    Eigen::Vector2f x = {0.5, 0.5};
+    LOG("-- input 1");
+    Eigen::Vector2f x = {0.2, 0.2};
     Eigen::VectorXf y = model.call(x);
 
-    LOG("output:");
-    utils::logging.log_vector(y);
-
-    LOG("");
     LOG("model length: " + std::to_string(model.len()));
+
+    LOG("-- input 2");
 
     x = {0.1, 0.1};
     y = model.call(x);
-    LOG("model length 2: " + std::to_string(model.len()));
+    LOG("model length: " + std::to_string(model.len()));
 
+    LOG("---");
+    LOG("connectivity:");
+    utils::logging.log_matrix(model.get_connectivity());
+
+    LOG("wrec:");
+    utils::logging.log_matrix(model.get_wrec());
 
     SPACE("#---#");
 }

@@ -786,8 +786,6 @@ class PCNN():
 
 
 
-
-
 def calc_weight_connectivity(M: np.ndarray,
                              threshold: float=0.5,
                              triangular: bool=False) -> np.ndarray:
