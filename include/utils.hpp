@@ -54,7 +54,7 @@ public:
                   const std::string &src = "MAIN") {
 
         std::cout << get_datetime() << " | " << src << " | [";
-        for (unsigned int i = 0; i < arr.size(); i++) {
+        for (size_t i = 0; i < arr.size(); i++) {
             std::cout << arr[i];
             if (i != arr.size() - 1) {
                 std::cout << ", ";
@@ -67,7 +67,7 @@ public:
                     const std::string &src = "MAIN") {
 
         std::cout << get_datetime() << " | " << src << " | [";
-        for (unsigned int i = 0; i < vec.size(); i++) {
+        for (size_t i = 0; i < vec.size(); i++) {
             std::cout << vec[i];
             if (i != vec.size() - 1) {
                 std::cout << ", ";
@@ -81,9 +81,9 @@ public:
 
         std::cout << get_datetime() << " | " << src << " | " << std::endl;
 
-        for (int i = 0; i < mat.rows(); i++) {
+        for (size_t i = 0; i < mat.rows(); i++) {
             std::cout << "[";
-            for (int j = 0; j < mat.cols(); j++) {
+            for (size_t j = 0; j < mat.cols(); j++) {
                 std::cout << mat(i, j);
                 if (j != mat.cols() - 1) {
                     std::cout << ", ";
@@ -98,7 +98,7 @@ public:
                       const std::string &src = "MAIN") {
 
         std::cout << get_datetime() << " | " << src << " | [";
-        for (unsigned int i = 0; i < arr.size(); i++) {
+        for (size_t i = 0; i < arr.size(); i++) {
             std::cout << arr[i];
             if (i != arr.size() - 1) {
                 std::cout << ", ";
@@ -310,7 +310,7 @@ Eigen::MatrixXf k_highest_neighbors(
         connectivity.rows(), connectivity.cols());
 
     // Iterate over each row
-    for (int i = 0; i < connectivity.rows(); i++) {
+    for (size_t i = 0; i < connectivity.rows(); i++) {
         // Get the row of the connectivity matrix
         Eigen::VectorXf row = connectivity.row(i);
 
@@ -330,7 +330,7 @@ Eigen::MatrixXf k_highest_neighbors(
             });
 
         // Set the top-k indices in the result matrix to 1
-        for (int j = 0; j < k; j++) {
+        for (size_t j = 0; j < k; j++) {
             int idx = value_index_pairs[j].second;
             result(i, idx) = 1;
         }
@@ -417,8 +417,8 @@ void fill_random(Eigen::MatrixXf &M, float sparsity = 0.0) {
     // make random generator
     RandomGenerator random = RandomGenerator();
 
-    for (int i = 0; i < M.rows(); i++) {
-        for (int j = 0; j < M.cols(); j++) {
+    for (size_t i = 0; i < M.rows(); i++) {
+        for (size_t j = 0; j < M.cols(); j++) {
             if (random.get_random_float() > sparsity) {
                 M(i, j) = random.get_random_float();
             }

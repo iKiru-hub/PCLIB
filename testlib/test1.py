@@ -147,16 +147,16 @@ def test_pcnn_plasticity():
     test the PCNN network model learning
     """
 
-    n = 3
+    n = 11
     Ni = 10
-    sigma = 0.1
+    sigma = 0.09
     bounds = np.array([0., 1., 0., 1.])
     xfilter = pclib.PCLayer(n, sigma, bounds)
 
     # definition
-    pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=10, offset=0.5,
-                      clip_min=0.09, threshold=0.6,
-                      rep_threshold=0.1, rec_threshold=0.01,
+    pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=3., offset=1.5,
+                      clip_min=0.09, threshold=0.5,
+                      rep_threshold=0.5, rec_threshold=0.01,
                       num_neighbors=8, trace_tau=0.1,
                       xfilter=xfilter, name="2D")
 
