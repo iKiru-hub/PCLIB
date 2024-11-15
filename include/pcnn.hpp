@@ -6,9 +6,11 @@
 #include <array>
 
 
-#define LOG(msg) utils::logging.log(msg, "PCLIB")
+/* #define LOG(msg) utils::logging.log(msg, "PCLIB") */
 #define SPACE utils::logging.space
 
+// blank log function
+void LOG(const std::string& msg) {}
 
 // DEBUGGING logs
 
@@ -195,6 +197,12 @@ public:
     Eigen::MatrixXf get_wrec() const { return Wrec; }
     Eigen::MatrixXf get_connectivity() const { return connectivity; }
     Eigen::VectorXf get_trace() const { return trace; }
+    float get_delta_update() const { return delta_wff; }
+
+    Eigen::MatrixXf get_centers() {
+        return utils::calc_centers_from_layer(
+            Wff, xfilter.get_centers());
+    }
 
 
 private:
@@ -219,7 +227,7 @@ private:
     float delta_wff;
     Eigen::MatrixXf Wrec;
     Eigen::MatrixXf connectivity;
-    Eigen::MatrixXf centers;
+    /* Eigen::MatrixXf centers; */
     Eigen::VectorXf mask;
     std::vector<int> fixed_indexes;
     std::vector<int> free_indexes;
@@ -280,8 +288,8 @@ private:
             update_recurrent();
 
             // make centers
-            centers = utils::calc_centers_from_layer(
-                Wff, xfilter.get_centers());
+            /* centers = utils::calc_centers_from_layer( */
+            /*     Wff, xfilter.get_centers()); */
         }
 
     }
@@ -344,14 +352,18 @@ private:
 
 
 
-// LEAKY VARIABLE
+/* LEAKY VARIABLE */
+
 class LeakyVariableND {
 public:
 
     LeakyVariableND(std::string name, float eq, float tau,
-                    size_t ndim)
-        : name(std::move(name)), eq(eq), tau(1.0f / tau),
-        ndim(ndim), v(Eigen::VectorXf::Constant(ndim, eq)) {
+                    int ndim, float min_v = 0.0)
+        : name(std::move(name)), tau(1.0f / tau), eq_base(eq),
+        ndim(ndim), min_v(min_v),
+        v(Eigen::VectorXf::Constant(ndim, eq)),
+        eq(Eigen::VectorXf::Constant(ndim, eq)){
+
         LOG("[+] LeakyVariableND created with name: " + this->name);
     }
 
@@ -361,32 +373,45 @@ public:
 
     /* @brief Call the LeakyVariableND with a 2D input
      * @param x A 2D input to the LeakyVariable */
-    void call(const Eigen::VectorXf& x) {
+    Eigen::VectorXf call(const Eigen::VectorXf x,
+                         const bool simulate = false) {
+
+        // simulate
+        if (simulate) {
+            Eigen::VectorXf z = v + (eq - v) * tau + x;
+            for (int i = 0; i < ndim; i++) {
+                if (z(i) < min_v) {
+                    z(i) = min_v;
+                }
+            }
+            return z;
+        }
 
         // Compute dv and update v
-        v += (Eigen::VectorXf::Constant(ndim, eq) - v) * tau + x;
+        v += (eq - v) * tau + x;
+        return v;
     }
-
 
     Eigen::VectorXf get_v() const { return v; }
     void print_v() const {
         std::cout << "v: " << v.transpose() << std::endl; }
     std::string str() const { return "LeakyVariableND." + name; }
     int len() const { return ndim; }
-
-    void repr() const {
-        LOG("LeakyVariableND." + name + "(eq=" +
-            std::to_string(eq) +
-            ", tau=" + std::to_string(tau) + ", ndim=" +
-            std::to_string(ndim) + ")");
+    std::string repr() const {
+        return "LeakyVariableND." + name + "(eq=" + \
+            std::to_string(eq_base) + ", tau=" + std::to_string(tau) + \
+            ", ndim=" + std::to_string(ndim) + ")";
     }
+    void set_eq(const Eigen::VectorXf& eq) { this->eq = eq; }
 
 private:
-    float eq;
-    float tau;
-    size_t ndim;
+    const float tau;
+    const int ndim;
+    const float min_v;
+    const float eq_base;
     std::string name;
     Eigen::VectorXf v;
+    Eigen::VectorXf eq;
 };
 
 
@@ -398,15 +423,30 @@ public:
      * @param input The input to the LeakyVariable
      * with `ndim` dimensions
     */
-    void call(float x = 0.0) {
+    float call(float x = 0.0,
+               bool simulate = false) {
+
+        // simulate
+        if (simulate) {
+            float z = v + (eq - v) * tau + x;
+            if (z < min_v) {
+                z = min_v;
+            }
+            return z;
+        }
+
         v = v + (eq - v) * tau + x;
+
+        if (v < min_v) {
+            v = min_v;
+        }
+        return v;
     }
 
     LeakyVariable1D(std::string name, float eq,
-                    float tau)
-        : name(std::move(name)), eq(eq), tau(1.0/tau) {
-
-        v = eq;
+                    float tau, float min_v = 0.0)
+        : name(std::move(name)), eq(eq), tau(1.0/tau),
+        v(eq), min_v(min_v){
 
         LOG("[+] LeakyVariable1D created with name: " + \
             this->name);
@@ -418,21 +458,24 @@ public:
 
     float get_v() { return v; }
     std::string str() { return "LeakyVariable." + name; }
-    int len() { return 1; }
-    void repr() {
-        LOG("LeakyVariable." + name + "(eq=" + \
-            std::to_string(eq) +
-            ", tau=" + std::to_string(tau) + ")");
+    std::string repr() {
+        return "LeakyVariable." + name + "(eq=" + \
+            std::to_string(eq) + ", tau=" + std::to_string(tau) + ")";
     }
+    int len() { return 1; }
+    std::string get_name() { return name; }
+    void set_eq(float eq) { this->eq = eq; }
+    void reset() { v = eq; }
 
 private:
-    float eq;
-    float tau;
+    const float min_v;
+    const float tau;
     float v;
+    float eq;
 };
 
 
-// SAMPLING MODULE
+/* SAMPLING MODULE */
 class SamplingModule {
 
 public:
