@@ -10,10 +10,10 @@ def test_sampling():
 
     """
     test the creation and functionality of the object
-    SamplingModule
+    ActionSampling2D
     """
 
-    sm = pclib.SamplingModule("default", 10)
+    sm = pclib.ActionSampling2D("default", 10)
 
     assert len(sm) == 9, "Size of the sampling module " + \
         f"is not correct {len(sm)}"

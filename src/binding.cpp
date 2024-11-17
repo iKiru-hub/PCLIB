@@ -12,19 +12,22 @@ PYBIND11_MODULE(pclib, m) {
           py::arg("flag"));
 
     // Sampling Module
-    py::class_<SamplingModule>(m, "SamplingModule")
+    py::class_<ActionSampling2D>(m, "ActionSampling2D")
         .def(py::init<std::string, float>(),
              py::arg("name"),
              py::arg("speed"))
-        .def("__call__", &SamplingModule::call,
+        .def("__call__", &ActionSampling2D::call,
              py::arg("keep") = false)
-        .def("update", &SamplingModule::update)
-        .def("__len__", &SamplingModule::len)
-        .def("__str__", &SamplingModule::str)
-        .def("reset", &SamplingModule::reset)
-        .def("is_done", &SamplingModule::is_done)
-        .def("get_idx", &SamplingModule::get_idx)
-        .def("get_counter", &SamplingModule::get_counter);
+        .def("update", &ActionSampling2D::update,
+             py::arg("score") = 0.0)
+        .def("__len__", &ActionSampling2D::len)
+        .def("__str__", &ActionSampling2D::str)
+        .def("__repr__", &ActionSampling2D::repr)
+        .def("reset", &ActionSampling2D::reset)
+        .def("is_done", &ActionSampling2D::is_done)
+        .def("get_idx", &ActionSampling2D::get_idx)
+        .def("get_counter", &ActionSampling2D::get_counter)
+        .def("get_values", &ActionSampling2D::get_values);
 
     // LeakyVariable 1D
     py::class_<LeakyVariable1D>(m, "LeakyVariable1D")

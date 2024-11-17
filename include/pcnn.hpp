@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <memory>
 #include <array>
+#include <tuple>
 
 
 /* #define LOG(msg) utils::logging.log(msg, "PCLIB") */
@@ -475,50 +476,62 @@ private:
 };
 
 
-/* SAMPLING MODULE */
-class SamplingModule {
+/* ACTION SAMPLING MODULE */
+
+class ActionSampling2D {
 
 public:
 
     std::string name;
 
-    SamplingModule(std::string name,
-                   float speed) : name(name), speed(speed) {
-        utils::logging.log("[+] SamplingModule");
+    ActionSampling2D(std::string name,
+                   float speed) : name(name)
+                {
+        update_actions(speed);
+        utils::logging.log("[+] ActionSampling2D." + name);
     }
 
-    ~SamplingModule() { utils::logging.log("[-] SamplingModule"); }
+    ~ActionSampling2D() {
+        utils::logging.log("[-] ActionSampling2D." + name); }
 
-    void call(bool keep = false) {
+    std::tuple<std::array<float, 2>, bool, int> call(bool keep = false) {
 
-        // keep current state
+        // Keep current state
         if (keep) {
             utils::logging.log("-- keep");
-            return;
-        };
+            return std::make_tuple(velocity, false, idx);
+        }
 
-        // all samples have been used
+        // All samples have been used
         if (counter == num_samples) {
-            keep = true;
-            idx = utils::arr_argmax(values);
-            velocity = samples[idx];
-            utils::logging.log("-- all samples used, picked: " + \
-                               std::to_string(idx));
-            return;
-        };
 
+            // try to sample a zero index
+            int zero_idx = sample_zero_idx();
+
+            if (zero_idx != -1) {
+                idx = zero_idx;
+            } else {
+                // Get the index of the maximum value
+                idx = utils::arr_argmax(values);
+            }
+
+            velocity = samples[idx];
+            return std::make_tuple(velocity, true, idx);
+        }
+
+        // Sample a new index
         idx = sample_idx();
         available_indexes[idx] = false;
         velocity = samples[idx];
-        utils::logging.log("-- sampled: " + std::to_string(idx));
-        return;
+
+        return std::make_tuple(velocity, false, idx);
     }
 
-    void update(float score) { values[idx] = score; }
+    void update(float score = 0.0f) { values[idx] = score; }
     bool is_done() { return counter == num_samples; }
-    std::string str() { return "SamplingModule." + name; }
+    std::string str() { return "ActionSampling2D." + name; }
+    std::string repr() { return "ActionSampling2D." + name; }
     int len() { return num_samples; }
-    std::array<float, 2> get_velocity() { return velocity; }
     const int get_idx() { return idx; }
     const int get_counter() { return counter; }
 
@@ -526,6 +539,9 @@ public:
         if (counter == 0) { return 0.0; }
         return values[idx];
     }
+
+    // @brief get values for the samples
+    const std::array<float, 9> get_values() { return values; }
 
     void reset() {
         idx = -1;
@@ -539,8 +555,7 @@ public:
 private:
 
     // parameters
-    const float speed;
-    const std::array<float, 2> samples[9] = {
+    std::array<float, 2> samples[9] = {
         {-1.0, 1.0},
         {0.0, 1.0},
         {1.0, 1.0},
@@ -557,13 +572,14 @@ private:
     const unsigned int num_samples = 9;
     std::array<float, 9> values = { 0.0 };
     std::array<float, 2> velocity = { 0.0 };
-
-    // variables
     int idx = -1;
+
+    // @brief variables
+    /* int idx = -1; */
     std::array<bool, 9> available_indexes = { true, true, true,
         true, true, true, true, true, true};
 
-    // sample a random index
+    // @brief sample a random index
     int sample_idx() {
 
         int idx = -1;
@@ -581,6 +597,45 @@ private:
         return idx;
     }
 
+    // @brief make a set of how values equal to zero
+    // and return a random index from it
+    int sample_zero_idx() {
+
+        std::vector<int> zero_indexes;
+        for (size_t i = 0; i < num_samples; i++) {
+            if (values[i] == 0.0) {
+                zero_indexes.push_back(i);
+            }
+        }
+
+        if (zero_indexes.size() > 1) {
+            return utils::random.get_random_element_vec(zero_indexes);
+        }
+
+        return -1;
+    }
+
+    // @brief update the actions given a speed
+    void update_actions(float speed) {
+
+        for (size_t i = 0; i < num_samples; i++) {
+            float dx = samples[i][0];
+            float dy = samples[i][1];
+            float scale = speed / std::sqrt(2.0f);
+            if (dx == 0.0 && dy == 0.0) {
+                continue;
+            } else if (dx == 0.0) {
+                dy *= speed;
+            } else if (dy == 0.0) {
+                dx *= speed;
+            } else {
+                // speed / sqrt(2)
+                dx *= scale;
+                dy *= scale;
+            }
+            samples[i] = {dx, dy};
+        }
+    }
 
 };
 
@@ -600,7 +655,7 @@ void test_layer() {
 
 void testSampling() {
 
-    SamplingModule sm = SamplingModule("Test", 10);
+    ActionSampling2D sm = ActionSampling2D("Test", 10);
 
     sm.str();
 
