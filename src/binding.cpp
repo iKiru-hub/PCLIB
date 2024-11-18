@@ -1,4 +1,5 @@
 #include "pcnn.hpp"
+#include "utils.hpp"
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
@@ -114,3 +115,4 @@ PYBIND11_MODULE(pclib, m) {
         .def("fwd_int", &PCNN::fwd_int,
              py::arg("a"));
 }
+

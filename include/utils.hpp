@@ -14,7 +14,6 @@ class Logger;
 class RandomGenerator;
 
 
-
 /* LOGGING */
 
 
@@ -109,7 +108,6 @@ public:
 };
 
 
-
 /* RANDOM GENERATORS */
 
 
@@ -188,9 +186,10 @@ private:
 };
 
 
-/* MISCELLANEOUS */
-
-
+void log_hello() {
+    Logger logging = Logger();
+    logging.log("Hello, World!");
+}
 
 
 /* NAMESPACE */
@@ -220,7 +219,7 @@ inline Eigen::VectorXf generalized_sigmoid(
     const Eigen::VectorXf& x,
     float offset = 1.0f,
     float gain = 1.0f,
-    float clip = 1.0f) {
+    float clip = 0.0f) {
     // Offset each element by `offset`, apply the gain,
     // and then compute the sigmoid
     Eigen::VectorXf result = 1.0f / (1.0f + \
