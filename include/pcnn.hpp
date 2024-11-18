@@ -488,11 +488,12 @@ public:
                    float speed) : name(name)
                 {
         update_actions(speed);
-        utils::logging.log("[+] ActionSampling2D." + name);
+        /* utils::logging.log("[+] ActionSampling2D." + name); */
     }
 
     ~ActionSampling2D() {
-        utils::logging.log("[-] ActionSampling2D." + name); }
+        /* utils::logging.log("[-] ActionSampling2D." + name); */
+    }
 
     std::tuple<std::array<float, 2>, bool, int> call(bool keep = false) {
 
