@@ -31,11 +31,11 @@ class Logger {
 
 public:
     Logger() {
-        std::cout << get_datetime() << " [+] Logger" << std::endl;
+        /* std::cout << get_datetime() << " [+] Logger" << std::endl; */
     }
 
     ~Logger() {
-        std::cout << get_datetime() << " [-] Logger" << std::endl;
+        /* std::cout << get_datetime() << " [-] Logger" << std::endl; */
     }
 
     void log(const std::string &msg,
@@ -115,11 +115,11 @@ class RandomGenerator {
 public:
     // Constructor with an optional seed for deterministic randomness
     RandomGenerator(int seed = 0) : gen(std::mt19937(seed)) {
-        std::cout << get_datetime() << " [+] RandomGenerator" << std::endl;
+        /* std::cout << get_datetime() << " [+] RandomGenerator" << std::endl; */
     }
 
     ~RandomGenerator() {
-        std::cout << get_datetime() << " [-] RandomGenerator" << std::endl;
+        /* std::cout << get_datetime() << " [-] RandomGenerator" << std::endl; */
     }
 
     // Template function to get a random element from an array
@@ -195,7 +195,6 @@ void log_hello() {
 /* NAMESPACE */
 
 namespace utils {
-
 
 //
 template <std::size_t N>
