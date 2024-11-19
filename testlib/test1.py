@@ -174,6 +174,26 @@ def test_pcnn_plasticity():
         f"correct {connectivity.sum()}"
 
 
+def test_two_layer_network():
+
+    """
+    test the two layer network model with
+    input 5, hidden 2 and output 1
+    """
+
+    Wh = np.random.randn(5, 2).tolist()
+    Wo = np.random.randn(2).tolist()
+
+    model = pclib.TwoLayerNetwork(Wh, Wo)
+
+    x = np.random.randn(5).tolist()
+    y, h = model(x)
+
+    assert type(y) == float, f"Output of the network is not " + \
+        f"correct {type(y)}"
+    assert len(h) == 2, f"Hidden layer output is not correct " + \
+        f"{len(h)}"
+
 
 if __name__ == "__main__":
     test_leakyND()

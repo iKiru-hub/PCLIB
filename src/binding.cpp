@@ -114,5 +114,15 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("x"))
         .def("fwd_int", &PCNN::fwd_int,
              py::arg("a"));
+
+    // 2 layer network
+    py::class_<TwoLayerNetwork>(m, "TwoLayerNetwork")
+        .def(py::init<std::array<std::array<float, 2>, 5>,
+             std::array<float, 2>>(),
+             py::arg("w_hidden"),
+             py::arg("w_output"))
+        .def("__call__", &TwoLayerNetwork::call,
+             py::arg("x"))
+        .def("__str__", &TwoLayerNetwork::str);
 }
 

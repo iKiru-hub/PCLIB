@@ -30,6 +30,7 @@ void DEBUG(const std::string& msg) {
 
 /* PCNN */
 
+
 class PCLayer {
 
 public:
@@ -352,8 +353,8 @@ private:
 };
 
 
-
 /* LEAKY VARIABLE */
+
 
 class LeakyVariableND {
 public:
@@ -477,6 +478,7 @@ private:
 
 
 /* ACTION SAMPLING MODULE */
+
 
 class ActionSampling2D {
 
@@ -638,6 +640,52 @@ private:
         }
     }
 
+};
+
+
+/* EXPERIENCE MODULE */
+
+
+struct TwoLayerNetwork {
+
+    // @brief forward an input through the network
+    // @return a tuple: (float, array<float, 2>)
+    std::tuple<float, std::array<float, 2>>
+    call(const std::array<float, 5>& x) {
+        hidden = {0.0, 0.0};
+        output = 0.0;
+
+        // hidden layer
+        for (size_t i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                hidden[i] += x[j] * w_hidden[i][j];
+            }
+            hidden[i] = hidden[i];
+        }
+
+        // output layer
+        for (size_t i = 0; i < 2; i++) {
+            output += hidden[i] * w_output[i];
+        }
+
+        return std::make_tuple(output, hidden);
+    }
+
+    TwoLayerNetwork(std::array<std::array<float, 2>, 5> w_hidden,
+                   std::array<float, 2> w_output)
+        : w_hidden(w_hidden), w_output(w_output) {}
+
+    ~TwoLayerNetwork() {}
+
+    std::string str() { return "TwoLayerNetwork"; }
+
+private:
+
+    //  matrix 5x2
+    const std::array<std::array<float, 2>, 5> w_hidden;
+    const std::array<float, 2> w_output;
+    std::array<float, 2> hidden;
+    float output;
 };
 
 
