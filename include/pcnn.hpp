@@ -134,6 +134,8 @@ public:
         pre_x = Eigen::VectorXf::Zero(N);
         cell_count = 0;
 
+        ach = 0.0;
+
         // make vector of free indexes
         for (int i = 0; i < N; i++) {
             free_indexes.push_back(i);
@@ -206,6 +208,10 @@ public:
             Wff, xfilter.get_centers());
     }
 
+    // @brief modulate the density of new PCs
+    void ach_modulation(float ach) {
+        this->ach = ach;
+    }
 
 private:
     // parameters
@@ -220,6 +226,8 @@ private:
     const int num_neighbors;
     const float trace_tau;
     const std::string name;
+
+    float ach;
 
     PCLayer xfilter;
 
@@ -272,15 +280,15 @@ private:
             Wff.row(idx) += dw.transpose();
 
             // calculate the similarity among the rows
-            float similarity = \
-                utils::max_cosine_similarity_in_rows(
-                    Wff, idx);
+            /* float similarity = \ */
+            /*     utils::max_cosine_similarity_in_rows( */
+            /*         Wff, idx); */
 
-            // check repulsion (similarity) level
-            if (similarity > rep_threshold) {
-                Wff.row(idx) = Wffbackup.row(idx);
-                return void();
-            }
+            /* // check repulsion (similarity) level */
+            /* if (similarity > rep_threshold) { */
+            /*     Wff.row(idx) = Wffbackup.row(idx); */
+            /*     return void(); */
+            /* } */
 
             // update count and backup
             cell_count++;
@@ -289,9 +297,6 @@ private:
             // update recurrent connections
             update_recurrent();
 
-            // make centers
-            /* centers = utils::calc_centers_from_layer( */
-            /*     Wff, xfilter.get_centers()); */
         }
 
     }
@@ -404,7 +409,13 @@ public:
             std::to_string(eq_base) + ", tau=" + std::to_string(tau) + \
             ", ndim=" + std::to_string(ndim) + ")";
     }
+    std::string get_name() { return name; }
     void set_eq(const Eigen::VectorXf& eq) { this->eq = eq; }
+    void reset() {
+        for (int i = 0; i < ndim; i++) {
+            v(i) = eq(i);
+        }
+    }
 
 private:
     const float tau;
@@ -660,7 +671,7 @@ struct TwoLayerNetwork {
             for (int j = 0; j < 2; j++) {
                 hidden[i] += x[j] * w_hidden[i][j];
             }
-            hidden[i] = hidden[i];
+            /* hidden[i] = hidden[i]; */
         }
 
         // output layer

@@ -46,7 +46,9 @@ PYBIND11_MODULE(pclib, m) {
         .def("__repr__", &LeakyVariable1D::repr)
         .def("get_v", &LeakyVariable1D::get_v)
         .def("get_name", &LeakyVariable1D::get_name)
-        .def("set_eq", &LeakyVariable1D::set_eq);
+        .def("set_eq", &LeakyVariable1D::set_eq,
+             py::arg("eq"))
+        .def("reset", &LeakyVariable1D::reset);
 
     // LeakyVariable ND
     py::class_<LeakyVariableND>(m, "LeakyVariableND")
@@ -65,7 +67,10 @@ PYBIND11_MODULE(pclib, m) {
         .def("__len__", &LeakyVariableND::len)
         .def("print_v", &LeakyVariableND::print_v)
         .def("get_v", &LeakyVariableND::get_v)
-        .def("set_eq", &LeakyVariableND::set_eq);
+        .def("get_name", &LeakyVariableND::get_name)
+        .def("set_eq", &LeakyVariableND::set_eq,
+             py::arg("eq"))
+        .def("reset", &LeakyVariableND::reset);
 
     // (InputFilter) Place Cell Layer
     py::class_<PCLayer>(m, "PCLayer")
