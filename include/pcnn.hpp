@@ -109,11 +109,13 @@ class PCNN {
 public:
     PCNN(int N, int Nj, float gain, float offset,
          float clip_min, float threshold,
+         float rep_threshold,
          float rec_threshold,
          int num_neighbors, float trace_tau,
          PCLayer xfilter, std::string name = "2D")
         : N(N), Nj(Nj), gain(gain), offset(offset),
         clip_min(clip_min), threshold(threshold),
+        rep_threshold(rep_threshold),
         rec_threshold(rec_threshold),
         num_neighbors(num_neighbors),
         trace_tau(trace_tau),
@@ -218,7 +220,7 @@ private:
     const float offset;
     const float clip_min;
     const float threshold;
-    /* const float rep_threshold; */
+    const float rep_threshold;
     const float rec_threshold;
     const int num_neighbors;
     const float trace_tau;
@@ -277,15 +279,15 @@ private:
             Wff.row(idx) += dw.transpose();
 
             // calculate the similarity among the rows
-            /* float similarity = \ */
-            /*     utils::max_cosine_similarity_in_rows( */
-            /*         Wff, idx); */
+            float similarity = \
+                utils::max_cosine_similarity_in_rows(
+                    Wff, idx);
 
-            /* // check repulsion (similarity) level */
-            /* if (similarity > rep_threshold) { */
-            /*     Wff.row(idx) = Wffbackup.row(idx); */
-            /*     return void(); */
-            /* } */
+            // check repulsion (similarity) level
+            if (similarity > rep_threshold) {
+                Wff.row(idx) = Wffbackup.row(idx);
+                return void();
+            }
 
             // update count and backup
             cell_count++;
@@ -784,7 +786,7 @@ void test_pcnn() {
     PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0});
     LOG(xfilter.str());
 
-    PCNN model = PCNN(3, Nj, 10., 0.1, 0.4, 0.1,
+    PCNN model = PCNN(3, Nj, 10., 0.1, 0.4, 0.1, 0.1,
                       0.5, 8, 0.1, xfilter, "2D");
 
     LOG(model.str());

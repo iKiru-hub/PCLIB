@@ -87,7 +87,7 @@ PYBIND11_MODULE(pclib, m) {
     // PCNN network model
     py::class_<PCNN>(m, "PCNN")
         .def(py::init<int, int, float, float,
-             float, float, float, \
+             float, float, float, float, \
              int, float, PCLayer, std::string>(),
              py::arg("N"),
              py::arg("Nj"),
@@ -95,6 +95,7 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("offset"),
              py::arg("clip_min"),
              py::arg("threshold"),
+             py::arg("rep_threshold"),
              py::arg("rec_threshold"),
              py::arg("num_neighbors"),
              py::arg("trace_tau"),
