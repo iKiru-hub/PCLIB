@@ -132,7 +132,7 @@ PYBIND11_MODULE(pclib, m) {
     // 1 layer network
     py::class_<OneLayerNetwork>(m, "OneLayerNetwork")
         .def(py::init<std::array<float, 5>>(),
-             py::arg("w_output"))
+             py::arg("weights"))
         .def("__call__", &OneLayerNetwork::call,
              py::arg("x"))
         .def("__str__", &OneLayerNetwork::str)

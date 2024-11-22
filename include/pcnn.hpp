@@ -704,23 +704,23 @@ struct OneLayerNetwork {
         output = 0.0;
         z = {};
         for (size_t i = 0; i < 5; i++) {
-            output += x[i] * w_output[i];
-            z[i] = x[i] * w_output[i];
+            output += x[i] * weights[i];
+            z[i] = x[i] * weights[i];
         }
         return std::make_tuple(output, z);
     }
 
-    OneLayerNetwork(std::array<float, 5> w_output)
-        : w_output(w_output) {
+    OneLayerNetwork(std::array<float, 5> weights)
+        : weights(weights) {
         z = {};
     }
     ~OneLayerNetwork() {}
     std::string str() { return "OneLayerNetwork"; }
-    std::array<float, 5> get_weights() { return w_output; }
+    std::array<float, 5> get_weights() { return weights; }
 
 private:
 
-    const std::array<float, 5> w_output;
+    const std::array<float, 5> weights;
     float output;
     std::array<float, 5> z;
 
