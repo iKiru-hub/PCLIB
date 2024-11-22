@@ -3,7 +3,7 @@
 # This script is used to build the project
 # ---
 
-trg_path="/Users/daniekru/Research/lab/PCNN/src/core"
+trg_path="/Users/daniekru/Research/lab/PCNN/src/libs"
 
 # build the project
 cd build

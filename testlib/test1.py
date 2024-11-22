@@ -195,6 +195,29 @@ def test_two_layer_network():
         f"{len(h)}"
 
 
+def test_one_layer_network():
+
+    """
+    test the one layer network model with
+    input 5, hidden 2 and output 1
+    """
+
+    Wh = np.random.randn(5).tolist()
+
+    model = pclib.OneLayerNetwork(Wh)
+
+    x = np.random.randn(5).tolist()
+    y, h = model(x)
+    wh = model.get_weights()
+
+    assert type(y) == float, f"Output of the network is not " + \
+        f"correct {type(y)}"
+    assert len(h) == 5, f"Hidden layer output is not correct " + \
+        f"{len(h)}"
+    assert len(wh) == 5, f"Hidden layer weights are not " \
+        f"correct {len(wh)}"
+
+
 if __name__ == "__main__":
     test_leakyND()
 

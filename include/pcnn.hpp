@@ -668,7 +668,6 @@ struct TwoLayerNetwork {
             for (int j = 0; j < 2; j++) {
                 hidden[i] += x[j] * w_hidden[i][j];
             }
-            /* hidden[i] = hidden[i]; */
         }
 
         // output layer
@@ -682,9 +681,7 @@ struct TwoLayerNetwork {
     TwoLayerNetwork(std::array<std::array<float, 2>, 5> w_hidden,
                    std::array<float, 2> w_output)
         : w_hidden(w_hidden), w_output(w_output) {}
-
     ~TwoLayerNetwork() {}
-
     std::string str() { return "TwoLayerNetwork"; }
 
 private:
@@ -694,6 +691,39 @@ private:
     const std::array<float, 2> w_output;
     std::array<float, 2> hidden;
     float output;
+};
+
+
+struct OneLayerNetwork {
+
+    // @brief forward an input through the network
+    // @return tuple(float, array<float, 2>)
+    std::tuple<float, std::array<float, 5>>
+    call(const std::array<float, 5> x) {
+
+        output = 0.0;
+        z = {};
+        for (size_t i = 0; i < 5; i++) {
+            output += x[i] * w_output[i];
+            z[i] = x[i] * w_output[i];
+        }
+        return std::make_tuple(output, z);
+    }
+
+    OneLayerNetwork(std::array<float, 5> w_output)
+        : w_output(w_output) {
+        z = {};
+    }
+    ~OneLayerNetwork() {}
+    std::string str() { return "OneLayerNetwork"; }
+    std::array<float, 5> get_weights() { return w_output; }
+
+private:
+
+    const std::array<float, 5> w_output;
+    float output;
+    std::array<float, 5> z;
+
 };
 
 

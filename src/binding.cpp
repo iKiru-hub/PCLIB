@@ -128,5 +128,14 @@ PYBIND11_MODULE(pclib, m) {
         .def("__call__", &TwoLayerNetwork::call,
              py::arg("x"))
         .def("__str__", &TwoLayerNetwork::str);
+
+    // 1 layer network
+    py::class_<OneLayerNetwork>(m, "OneLayerNetwork")
+        .def(py::init<std::array<float, 5>>(),
+             py::arg("w_output"))
+        .def("__call__", &OneLayerNetwork::call,
+             py::arg("x"))
+        .def("__str__", &OneLayerNetwork::str)
+        .def("get_weights", &OneLayerNetwork::get_weights);
 }
 
