@@ -128,7 +128,7 @@ def test_pcnn_basics():
     # definition
     pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=0.1, offset=0.1,
                       clip_min=0.01, threshold=0.1,
-                      rep_threshold=0.1, rec_threshold=0.1,
+                      rec_threshold=0.1,
                       num_neighbors=8, trace_tau=0.1,
                       xfilter=xfilter, name="2D")
     assert pcnn.get_size() == Ni, f"Number of neurons is not " + \
@@ -156,7 +156,7 @@ def test_pcnn_plasticity():
     # definition
     pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=3., offset=1.5,
                       clip_min=0.09, threshold=0.5,
-                      rep_threshold=0.5, rec_threshold=0.01,
+                      rec_threshold=0.01,
                       num_neighbors=8, trace_tau=0.1,
                       xfilter=xfilter, name="2D")
 
