@@ -4,6 +4,7 @@
 #include <random>
 #include <array>
 #include <ctime>
+#include <cmath>
 #include <algorithm>
 #include <iterator>
 
@@ -214,7 +215,7 @@ int arr_argmax(std::array<float, N> arr) {
  * @param clip: clip parameter
  * @return: sigmoid output : Eigen::Vector2d
  */
-inline Eigen::VectorXf generalized_sigmoid(
+inline Eigen::VectorXf generalized_sigmoid_vec(
     const Eigen::VectorXf& x,
     float offset = 1.0f,
     float gain = 1.0f,
@@ -227,6 +228,30 @@ inline Eigen::VectorXf generalized_sigmoid(
     return (result.array() >= clip).select(result, 0.0f);
 }
 
+// @brief like above with float
+float generalized_sigmoid(const float& x,
+    float offset = 1.0f,
+    float gain = 1.0f,
+    float clip = 0.0f) {
+    // Offset each element by `offset`, apply the gain,
+    // and then compute the sigmoid
+    float result = 1.0f / (1.0f + \
+        exp(-gain * (x - offset)));
+
+    return (result >= clip) ? result : 0.0f;
+}
+
+// @brief Calculate a generalized tanh function with offset, gain, and clipping.
+/// @param x Input value.
+/// @param offset Offset to subtract from x before applying tanh.
+/// @param gain Gain factor to scale the input after offset.
+/// @param clip Minimum threshold for the result; values below this are set to 0.
+/// @return The calculated tanh value or 0 if below the clip threshold.
+float generalized_tanh(float x, float offset = 0.0f,
+                       float gain = 1.0f) {
+    // Offset the input, apply gain, and compute tanh
+    return std::tanh(gain * (x - offset));
+}
 // @brief cosine similarity
 inline float cosine_similarity_vec(const Eigen::VectorXf& v1,
                                    const Eigen::VectorXf& v2) {

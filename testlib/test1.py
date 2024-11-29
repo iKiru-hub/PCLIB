@@ -88,6 +88,17 @@ def test_leakyND():
         f" after second call is not correct v={lv.get_v()}"
 
 
+def test_densitymod():
+
+    x, w = np.random.randn(2, 5)
+    mod = pclib.DensityMod(weights=w,
+                           theta=0.1)
+    y = mod(x=x)
+
+    assert isinstance(y, float), f"Output of the density " + \
+        f"modulator is not correct {type(y)}"
+
+
 def test_pclayer():
 
     """

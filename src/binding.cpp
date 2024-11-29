@@ -12,23 +12,62 @@ PYBIND11_MODULE(pclib, m) {
     m.def("set_debug", &set_debug,
           py::arg("flag"));
 
-    // Sampling Module
-    py::class_<ActionSampling2D>(m, "ActionSampling2D")
-        .def(py::init<std::string, float>(),
-             py::arg("name"),
-             py::arg("speed"))
-        .def("__call__", &ActionSampling2D::call,
-             py::arg("keep") = false)
-        .def("update", &ActionSampling2D::update,
-             py::arg("score") = 0.0)
-        .def("__len__", &ActionSampling2D::len)
-        .def("__str__", &ActionSampling2D::str)
-        .def("__repr__", &ActionSampling2D::repr)
-        .def("reset", &ActionSampling2D::reset)
-        .def("is_done", &ActionSampling2D::is_done)
-        .def("get_idx", &ActionSampling2D::get_idx)
-        .def("get_counter", &ActionSampling2D::get_counter)
-        .def("get_values", &ActionSampling2D::get_values);
+    /* PCNN MODEL */
+
+    // (InputFilter) Place Cell Layer
+    py::class_<PCLayer>(m, "PCLayer")
+        .def(py::init<int, float, std::array<float, 4>>(),
+             py::arg("n"),
+             py::arg("sigma"),
+             py::arg("bounds"))
+        .def("__call__", &PCLayer::call,
+             py::arg("x"))
+        .def("__str__", &PCLayer::str)
+        .def("__len__", &PCLayer::len)
+        .def("__repr__", &PCLayer::repr)
+        .def("get_centers", &PCLayer::get_centers);
+
+    // PCNN network model
+    py::class_<PCNN>(m, "PCNN")
+        .def(py::init<int, int, float, float,
+             float, float, float, float, \
+             int, float, PCLayer, std::string>(),
+             py::arg("N"),
+             py::arg("Nj"),
+             py::arg("gain"),
+             py::arg("offset"),
+             py::arg("clip_min"),
+             py::arg("threshold"),
+             py::arg("rep_threshold"),
+             py::arg("rec_threshold"),
+             py::arg("num_neighbors"),
+             py::arg("trace_tau"),
+             py::arg("xfilter"),
+             py::arg("name"))
+        .def("__call__", &PCNN::call,
+             py::arg("x"),
+             py::arg("frozen") = false,
+             py::arg("traced") = true)
+        .def("__str__", &PCNN::str)
+        .def("__len__", &PCNN::len)
+        .def("__repr__", &PCNN::repr)
+        .def("update", &PCNN::update)
+        .def("ach_modulation", &PCNN::ach_modulation,
+             py::arg("ach"))
+        .def("get_size", &PCNN::get_size)
+        .def("get_trace", &PCNN::get_trace)
+        .def("get_wff", &PCNN::get_wff)
+        .def("get_wrec", &PCNN::get_wrec)
+        .def("get_connectivity", &PCNN::get_connectivity)
+        .def("get_delta_update", &PCNN::get_delta_update)
+        .def("get_centers", &PCNN::get_centers)
+        .def("fwd_ext", &PCNN::fwd_ext,
+             py::arg("x"))
+        .def("fwd_int", &PCNN::fwd_int,
+             py::arg("a"));
+
+
+    /* MODULATION MODULES */
 
     // LeakyVariable 1D
     py::class_<LeakyVariable1D>(m, "LeakyVariable1D")
@@ -72,53 +111,35 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("eq"))
         .def("reset", &LeakyVariableND::reset);
 
-    // (InputFilter) Place Cell Layer
-    py::class_<PCLayer>(m, "PCLayer")
-        .def(py::init<int, float, std::array<float, 4>>(),
-             py::arg("n"),
-             py::arg("sigma"),
-             py::arg("bounds"))
-        .def("__call__", &PCLayer::call,
+    // Density modulation
+    py::class_<DensityMod>(m, "DensityMod")
+        .def(py::init<std::array<float, 5>, float>(),
+             py::arg("weights"),
+             py::arg("theta"))
+        .def("__str__", &DensityMod::str)
+        .def("__call__", &DensityMod::call,
              py::arg("x"))
-        .def("__str__", &PCLayer::str)
-        .def("__len__", &PCLayer::len)
-        .def("__repr__", &PCLayer::repr);
+        .def("get_value", &DensityMod::get_value);
 
-    // PCNN network model
-    py::class_<PCNN>(m, "PCNN")
-        .def(py::init<int, int, float, float,
-             float, float, float, float, \
-             int, float, PCLayer, std::string>(),
-             py::arg("N"),
-             py::arg("Nj"),
-             py::arg("gain"),
-             py::arg("offset"),
-             py::arg("clip_min"),
-             py::arg("threshold"),
-             py::arg("rep_threshold"),
-             py::arg("rec_threshold"),
-             py::arg("num_neighbors"),
-             py::arg("trace_tau"),
-             py::arg("xfilter"),
-             py::arg("name"))
-        .def("__call__", &PCNN::call,
-             py::arg("x"),
-             py::arg("frozen") = false,
-             py::arg("traced") = true)
-        .def("__str__", &PCNN::str)
-        .def("__len__", &PCNN::len)
-        .def("__repr__", &PCNN::repr)
-        .def("get_size", &PCNN::get_size)
-        .def("get_trace", &PCNN::get_trace)
-        .def("get_wff", &PCNN::get_wff)
-        .def("get_wrec", &PCNN::get_wrec)
-        .def("get_connectivity", &PCNN::get_connectivity)
-        .def("get_delta_update", &PCNN::get_delta_update)
-        .def("get_centers", &PCNN::get_centers)
-        .def("fwd_ext", &PCNN::fwd_ext,
-             py::arg("x"))
-        .def("fwd_int", &PCNN::fwd_int,
-             py::arg("a"));
+    /* ACTION SAMPLING MODULE */
+
+    // Sampling Module
+    py::class_<ActionSampling2D>(m, "ActionSampling2D")
+        .def(py::init<std::string, float>(),
+             py::arg("name"),
+             py::arg("speed"))
+        .def("__call__", &ActionSampling2D::call,
+             py::arg("keep") = false)
+        .def("update", &ActionSampling2D::update,
+             py::arg("score") = 0.0)
+        .def("__len__", &ActionSampling2D::len)
+        .def("__str__", &ActionSampling2D::str)
+        .def("__repr__", &ActionSampling2D::repr)
+        .def("reset", &ActionSampling2D::reset)
+        .def("is_done", &ActionSampling2D::is_done)
+        .def("get_idx", &ActionSampling2D::get_idx)
+        .def("get_counter", &ActionSampling2D::get_counter)
+        .def("get_values", &ActionSampling2D::get_values);
 
     // 2 layer network
     py::class_<TwoLayerNetwork>(m, "TwoLayerNetwork")

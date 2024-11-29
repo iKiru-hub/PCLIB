@@ -134,7 +134,7 @@ public:
         pre_x = Eigen::VectorXf::Zero(N);
         cell_count = 0;
 
-        ach = 0.0;
+        ach = 1.0;
 
         // make vector of free indexes
         for (int i = 0; i < N; i++) {
@@ -154,7 +154,7 @@ public:
         // with the feedforward weights
         u = Wff * x_filtered + pre_x;
 
-        u = utils::generalized_sigmoid(u, offset, gain, clip_min);
+        u = utils::generalized_sigmoid_vec(u, offset, gain, clip_min);
 
         // update the trace
         if (traced) {
@@ -162,11 +162,66 @@ public:
         }
 
         // update model
-        if (!frozen) {
-            update(x_filtered);
-        }
+        /* if (!frozen) { */
+        /*     update(x_filtered); */
+        /* } */
 
         return u;
+    }
+
+    // @brief update the model
+    void update() {
+
+        make_indexes();
+
+        // exit: a fixed neuron is above threshold
+        if (check_fixed_indexes() != -1) {
+            DEBUG("!Fixed index above threshold");
+           return void();
+        };
+
+        // exit: there are no free neurons
+        if (free_indexes.size() == 0) {
+            DEBUG("!No free neurons");
+            return void();
+        };
+
+        // pick new index
+        int idx = utils::random.get_random_element_vec(
+                                        free_indexes);
+        DEBUG("Picked index: " + std::to_string(idx));
+
+        // determine weight update
+        Eigen::VectorXf dw = x_filtered - Wff.row(idx).transpose();
+        delta_wff = dw.norm();
+
+        if (delta_wff > 0.0) {
+
+            DEBUG("delta_wff: " + std::to_string(delta_wff));
+
+            // update weights
+            Wff.row(idx) += dw.transpose();
+
+            // calculate the similarity among the rows
+            float similarity = \
+                utils::max_cosine_similarity_in_rows(
+                    Wff, idx);
+
+            // check repulsion (similarity) level
+            if (similarity > (rep_threshold * ach)) {
+                Wff.row(idx) = Wffbackup.row(idx);
+                return void();
+            }
+
+            // update count and backup
+            cell_count++;
+            Wffbackup.row(idx) = Wff.row(idx);
+
+            // update recurrent connections
+            update_recurrent();
+
+        }
+
     }
 
    Eigen::VectorXf fwd_ext(const Eigen::Vector2f& x) {
@@ -246,60 +301,6 @@ private:
     Eigen::VectorXf trace;
     Eigen::VectorXf pre_x;
 
-    void update(Eigen::VectorXf& x) {
-
-        make_indexes();
-
-        // exit: a fixed neuron is above threshold
-        if (check_fixed_indexes() != -1) {
-            DEBUG("!Fixed index above threshold");
-           return void();
-        };
-
-        // exit: there are no free neurons
-        if (free_indexes.size() == 0) {
-            DEBUG("!No free neurons");
-            return void();
-        };
-
-        // pick new index
-        int idx = utils::random.get_random_element_vec(
-                                        free_indexes);
-        DEBUG("Picked index: " + std::to_string(idx));
-
-        // determine weight update
-        Eigen::VectorXf dw = x - Wff.row(idx).transpose();
-        delta_wff = dw.norm();
-
-        if (delta_wff > 0.0) {
-
-            DEBUG("delta_wff: " + std::to_string(delta_wff));
-
-            // update weights
-            Wff.row(idx) += dw.transpose();
-
-            // calculate the similarity among the rows
-            float similarity = \
-                utils::max_cosine_similarity_in_rows(
-                    Wff, idx);
-
-            // check repulsion (similarity) level
-            if (similarity > rep_threshold) {
-                Wff.row(idx) = Wffbackup.row(idx);
-                return void();
-            }
-
-            // update count and backup
-            cell_count++;
-            Wffbackup.row(idx) = Wff.row(idx);
-
-            // update recurrent connections
-            update_recurrent();
-
-        }
-
-    }
-
     // @brief check if one of the fixed neurons
     int check_fixed_indexes() {
 
@@ -319,7 +320,7 @@ private:
             };
         };
 
-        if (max_u < threshold) { return -1; }
+        if (max_u < (threshold * ach) ) { return -1; }
         else {
             DEBUG("Fixed index above threshold: " + \
                 std::to_string(max_u) + \
@@ -357,8 +358,9 @@ private:
 };
 
 
-/* LEAKY VARIABLE */
+/* MODULATION MODULES */
 
+// leaky variable
 
 class LeakyVariableND {
 public:
@@ -484,6 +486,38 @@ private:
     const float tau;
     float v;
     float eq;
+};
+
+
+// density modulation
+
+class DensityMod {
+
+public:
+
+    DensityMod(std::array<float, 5> weights,
+               float theta):
+        weights(weights), theta(theta), baseline(theta) {}
+
+    ~DensityMod() {}
+
+    float call(const std::array<float, 5>& x) {
+        dtheta = 0.0;
+        for (size_t i = 0; i < 5; i++) {
+            dtheta += x[i] * weights[i];
+        }
+        theta = baseline + utils::generalized_tanh(
+            dtheta, 0.0, 1.0);
+        return theta;
+    }
+    std::string str() { return "DensityMod"; }
+    float get_value() { return theta; }
+
+private:
+    std::array<float, 5> weights;
+    float baseline;
+    float theta;
+    float dtheta;
 };
 
 
@@ -653,9 +687,6 @@ private:
 };
 
 
-/* EXPERIENCE MODULE */
-
-
 struct TwoLayerNetwork {
 
     // @brief forward an input through the network
@@ -725,6 +756,14 @@ private:
     const std::array<float, 5> weights;
     float output;
     std::array<float, 5> z;
+
+};
+
+
+/* EXPERIENCE MODULE */
+
+
+class ExperienceModule {
 
 };
 
