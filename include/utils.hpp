@@ -167,7 +167,7 @@ public:
     }
 
     // random integer in the range [min, max]
-    int get_random_int(int min, int max) {
+    int get_random_int(int min = 0, int max = 10) {
         std::uniform_int_distribution<int> dist(min, max);
         return dist(gen);
     }
@@ -279,6 +279,53 @@ Eigen::MatrixXf cosine_similarity_matrix(
     similarity_matrix.diagonal().setZero();
 
     return similarity_matrix;
+}
+
+// @brief cosine similarity between a vector and each
+// row in a matrix
+Eigen::VectorXf cosine_similarity_vector_matrix(
+    const Eigen::VectorXf& vector,
+    const Eigen::MatrixXf& matrix) {
+
+    // Normalize the vector to unit norm
+    Eigen::VectorXf normalized_vector = vector.normalized();
+
+    // set NaN values to zero
+    normalized_vector = (normalized_vector.array().isNaN()).select(
+        Eigen::VectorXf::Zero(matrix.rows()), normalized_vector);
+
+    // Normalize each row of the matrix to unit norm
+    Eigen::MatrixXf normalized_matrix = matrix.rowwise().normalized();
+
+    // set NaN values to zero
+    normalized_matrix = (normalized_matrix.array().isNaN()).select(
+        Eigen::MatrixXf::Zero(matrix.rows(), matrix.cols()), normalized_matrix);
+
+    // Compute the cosine similarity
+    Eigen::VectorXf similarity_vector = \
+        normalized_matrix * normalized_vector;
+
+    return similarity_vector;
+}
+
+// @brief: calculate the Gaussian distance between a vector
+// and a matrix of vectors
+Eigen::VectorXf gaussian_distance(
+    const Eigen::VectorXf& x,
+    const Eigen::MatrixXf& y,
+    const Eigen::VectorXf& sigma) {
+
+    // Calculate the squared Euclidean distance
+    Eigen::MatrixXf diff = y.rowwise() - x.transpose();
+
+    // Calculate the squared Euclidean distance
+    // and divide by the squared sigma
+    // to get the Gaussian distance
+    Eigen::VectorXf distance = \
+        diff.array().square().rowwise().sum().array() / \
+        sigma.array().square();
+
+    return distance;
 }
 
 // @brief: calculate the maximum cosine similarity in a rows

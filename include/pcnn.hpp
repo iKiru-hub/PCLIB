@@ -11,7 +11,9 @@
 #define SPACE utils::logging.space
 
 // blank log function
-void LOG(const std::string& msg) {}
+void LOG(const std::string& msg) {
+    /* std::cout << msg << std::endl; */
+}
 
 // DEBUGGING logs
 
@@ -29,6 +31,83 @@ void DEBUG(const std::string& msg) {
 
 
 /* PCNN */
+
+class RandLayer {
+
+public:
+
+    RandLayer(int N): N(N) {
+
+        // Compute the centers
+        compute_matrix();
+
+        LOG("[+] RandLayer created");
+    }
+
+    ~RandLayer() { LOG("[-] PCLayer destroyed"); }
+
+    // @brief Call the RandLayer with a 2D input and
+    // apply a the layer's linear projection
+    Eigen::VectorXf call(const Eigen::Vector2f& x) {
+        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
+        for (int i = 0; i < N; i++) {
+            y(i) = matrix.row(i).dot(x);
+        }
+        return y;
+    }
+
+    std::string str() { return "RandLayer"; }
+    int len() { return N; }
+    Eigen::MatrixXf get_centers() { return matrix; }
+    std::string repr() {
+        return "RandLayer(n=" + std::to_string(N) + ")";
+    }
+
+private:
+
+    int N;
+    Eigen::MatrixXf matrix;
+
+    // @brief calculate the basis of a linear projection
+    // 2D -> nD as set of orthogonal vectors through
+    // the Gram-Schmidt process
+    void compute_matrix() {
+
+        // define two random vectors of length N
+        // in the range [0, 1]
+        Eigen::VectorXf v1 = (Eigen::VectorXf::Random(N) + \
+            Eigen::VectorXf::Ones(N)) / 2;
+        Eigen::VectorXf v2 = (Eigen::VectorXf::Random(N) + \
+            Eigen::VectorXf::Ones(N)) / 2;
+
+        // dot products
+        float multiplier = v1.dot(v2) / v1.dot(v1);
+        Eigen::VectorXf v2_orth = v2 - multiplier * v1;
+
+        // no negative entries:
+        /* for (int i = 0; i < N; i++) { */
+        /*     if (v2_orth(i) < 0) { */
+
+        /*         // randomly select one option */
+        /*         // 1) set to zero */
+        /*         // 2) flip the sign and zero */
+        /*         // the other vector */
+        /*         if (utils::random.get_random_float() > 0.5) { */
+        /*             v2_orth(i) = 0.0; */
+        /*         } else { */
+        /*             v2_orth(i) = -v2_orth(i); */
+        /*             v1(i) = 0.0; */
+        /*         } */
+        /*     } */
+        /* } */
+
+        // define final matrix
+        matrix = Eigen::MatrixXf::Zero(N, 2);
+        matrix.col(0) = v1;
+        matrix.col(1) = v2_orth;
+    }
+
+};
 
 
 class PCLayer {
@@ -112,14 +191,15 @@ public:
          float rep_threshold,
          float rec_threshold,
          int num_neighbors, float trace_tau,
-         PCLayer xfilter, std::string name = "2D")
+         RandLayer xfilter, std::string name = "2D")
         : N(N), Nj(Nj), gain(gain), offset(offset),
         clip_min(clip_min), threshold(threshold),
         rep_threshold(rep_threshold),
         rec_threshold(rec_threshold),
         num_neighbors(num_neighbors),
         trace_tau(trace_tau),
-        xfilter(xfilter), name(name) {
+        xfilter(std::move(xfilter)),
+        name(name) {
 
         // Initialize the variables
         Wff = Eigen::MatrixXf::Zero(N, Nj);
@@ -153,8 +233,13 @@ public:
         // forward it to the network by doing a dot product
         // with the feedforward weights
         u = Wff * x_filtered + pre_x;
+        /* u = utils::cosine_similarity_vector_matrix( */
+                /* x_filtered, Wff); */
+        // maybe use cosine similarity?
+        u = utils::gaussian_distance(x_filtered, Wff);
 
-        u = utils::generalized_sigmoid_vec(u, offset, gain, clip_min);
+        u = utils::generalized_sigmoid_vec(u, offset,
+                                           gain, clip_min);
 
         // update the trace
         if (traced) {
@@ -283,7 +368,7 @@ private:
 
     float ach;
 
-    PCLayer xfilter;
+    RandLayer xfilter;
 
     // variables
     Eigen::MatrixXf Wff;
@@ -822,7 +907,8 @@ void test_pcnn() {
     int n = 3;
     int Nj = std::pow(n, 2);
 
-    PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0});
+    /* PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0}); */
+    RandLayer xfilter = RandLayer(Nj);
     LOG(xfilter.str());
 
     PCNN model = PCNN(3, Nj, 10., 0.1, 0.4, 0.1, 0.1,
@@ -833,13 +919,14 @@ void test_pcnn() {
     LOG("-- input 1");
     Eigen::Vector2f x = {0.2, 0.2};
     Eigen::VectorXf y = model.call(x);
-
+    model.update();
     LOG("model length: " + std::to_string(model.len()));
 
     LOG("-- input 2");
 
     x = {0.1, 0.1};
     y = model.call(x);
+    model.update();
     LOG("model length: " + std::to_string(model.len()));
 
     LOG("---");
@@ -848,6 +935,31 @@ void test_pcnn() {
 
     LOG("wrec:");
     utils::logging.log_matrix(model.get_wrec());
+
+    SPACE("#---#");
+}
+
+void test_randlayer() {
+
+    SPACE("#---#");
+
+    LOG("Testing RandLayer...");
+
+    int N = 5;
+
+    RandLayer layer = RandLayer(N);
+    LOG(layer.str());
+
+    Eigen::Vector2f x = {0.2, 0.2};
+    Eigen::VectorXf y = layer.call(x);
+
+    // log y
+    utils::logging.log_vector(y);
+
+    LOG("layer length: " + std::to_string(layer.len()));
+
+    LOG("matrix:");
+    utils::logging.log_matrix(layer.get_centers());
 
     SPACE("#---#");
 }

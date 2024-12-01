@@ -14,6 +14,17 @@ PYBIND11_MODULE(pclib, m) {
 
     /* PCNN MODEL */
 
+    // (InputFilter) Random Layer
+    py::class_<RandLayer>(m, "RandLayer")
+        .def(py::init<int>(),
+             py::arg("N"))
+        .def("__call__", &RandLayer::call,
+             py::arg("x"))
+        .def("__str__", &RandLayer::str)
+        .def("__len__", &RandLayer::len)
+        .def("__repr__", &RandLayer::repr)
+        .def("get_centers", &RandLayer::get_centers);
+
     // (InputFilter) Place Cell Layer
     py::class_<PCLayer>(m, "PCLayer")
         .def(py::init<int, float, std::array<float, 4>>(),
@@ -31,7 +42,7 @@ PYBIND11_MODULE(pclib, m) {
     py::class_<PCNN>(m, "PCNN")
         .def(py::init<int, int, float, float,
              float, float, float, float, \
-             int, float, PCLayer, std::string>(),
+             int, float, RandLayer, std::string>(),
              py::arg("N"),
              py::arg("Nj"),
              py::arg("gain"),

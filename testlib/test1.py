@@ -99,6 +99,30 @@ def test_densitymod():
         f"modulator is not correct {type(y)}"
 
 
+def test_randlayer():
+
+    """
+    test the random input layer
+    """
+
+    N = 5
+
+    # defintion
+    layer = pclib.RandLayer(N)
+
+    # check dimensions of the matrix
+    m = layer.get_centers()
+    assert (N, 2) == m.shape, f"Dimension of the layer is not " + \
+        f"correct {m.shape} expected {(N, 2)}"
+
+    # check call
+    x = np.array([0.5, 0.5])
+    y = layer(x)
+
+    assert len(y) == N, f"Output of the layer is not" + \
+        f" correct {len(y)}"
+
+
 def test_pclayer():
 
     """
@@ -134,7 +158,8 @@ def test_pcnn_basics():
     Ni = 10
     sigma = 0.1
     bounds = np.array([0., 1., 0., 1.])
-    xfilter = pclib.PCLayer(n, sigma, bounds)
+    # xfilter = pclib.PCLayer(n, sigma, bounds)
+    xfilter = pclib.RandLayer(int(n**2))
 
     # definition
     pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=0.1, offset=0.1,
@@ -159,32 +184,35 @@ def test_pcnn_plasticity():
     test the PCNN network model learning
     """
 
-    n = 11
+    n = 12
     Ni = 10
-    sigma = 0.09
+    sigma = 0.04
     bounds = np.array([0., 1., 0., 1.])
-    xfilter = pclib.PCLayer(n, sigma, bounds)
+    # xfilter = pclib.PCLayer(n, sigma, bounds)
+    xfilter = pclib.RandLayer(int(n**2))
 
     # definition
-    pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=3., offset=1.5,
-                      clip_min=0.09, threshold=0.5,
-                      rep_threshold=0.5,
-                      rec_threshold=0.01,
+    pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=3., offset=1.,
+                      clip_min=0.09, threshold=0.3,
+                      rep_threshold=0.7,
+                      rec_threshold=0.0,
                       num_neighbors=8, trace_tau=0.1,
                       xfilter=xfilter, name="2D")
 
     # check learning
     x = np.array([0.5, 0.5])
     _ = pcnn(x)
-    assert len(pcnn) == 1, f"Wrong number of learned pc, given {len(pcnn)}" + \
-        f" expected 1"
+    pcnn.update()
+    assert len(pcnn) == 1, f"Wrong number of learned pc, " + \
+        f"given {len(pcnn)} expected 1"
 
     # check recurrent connectivity
-    x = np.array([0.45, 0.7])
+    x = np.array([0.45, 0.6])
     _ = pcnn(x)
+    pcnn.update()
     connectivity = pcnn.get_connectivity()
-    assert connectivity.sum() == 2, f"Recurrent connectivity is not " + \
-        f"correct {connectivity.sum()}"
+    assert connectivity.sum() == 2, f"Recurrent connectivity" + \
+        f" is not correct {connectivity.sum()}"
 
 
 def test_two_layer_network():
