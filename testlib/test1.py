@@ -158,8 +158,8 @@ def test_pcnn_basics():
     Ni = 10
     sigma = 0.1
     bounds = np.array([0., 1., 0., 1.])
-    # xfilter = pclib.PCLayer(n, sigma, bounds)
-    xfilter = pclib.RandLayer(int(n**2))
+    xfilter = pclib.PCLayer(n, sigma, bounds)
+    # xfilter = pclib.RandLayer(int(n**2))
 
     # definition
     pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=0.1, offset=0.1,
@@ -188,12 +188,12 @@ def test_pcnn_plasticity():
     Ni = 10
     sigma = 0.04
     bounds = np.array([0., 1., 0., 1.])
-    # xfilter = pclib.PCLayer(n, sigma, bounds)
-    xfilter = pclib.RandLayer(int(n**2))
+    xfilter = pclib.PCLayer(n, sigma, bounds)
+    # xfilter = pclib.RandLayer(int(n**2))
 
     # definition
     pcnn = pclib.PCNN(N=Ni, Nj=n**2, gain=3., offset=1.,
-                      clip_min=0.09, threshold=0.3,
+                      clip_min=0.09, threshold=0.5,
                       rep_threshold=0.7,
                       rec_threshold=0.0,
                       num_neighbors=8, trace_tau=0.1,
@@ -206,10 +206,14 @@ def test_pcnn_plasticity():
     assert len(pcnn) == 1, f"Wrong number of learned pc, " + \
         f"given {len(pcnn)} expected 1"
 
-    # check recurrent connectivity
     x = np.array([0.45, 0.6])
     _ = pcnn(x)
     pcnn.update()
+
+    assert len(pcnn) == 2, f"Wrong number of learned pc, " + \
+        f"given {len(pcnn)} expected 2\n{pcnn.get_wff().sum(axis=1)}"
+
+    # check recurrent connectivity
     connectivity = pcnn.get_connectivity()
     assert connectivity.sum() == 2, f"Recurrent connectivity" + \
         f" is not correct {connectivity.sum()}"

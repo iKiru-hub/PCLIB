@@ -23,7 +23,8 @@ int main() {
     /* /1* utils::test_max_cosine(); *1/ */
     /* utils::test_connectivity(); */
     /* utils::test_make_position(); */
-    pcl::test_randlayer();
+    /* pcl::test_randlayer(); */
+    utils::test_orth_matrix<2, 5>();
 
     // test tanh
     /* float out = utils::generalized_tanh(-1); */

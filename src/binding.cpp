@@ -25,6 +25,46 @@ PYBIND11_MODULE(pclib, m) {
         .def("__repr__", &RandLayer::repr)
         .def("get_centers", &RandLayer::get_centers);
 
+    // PCNN network model [Rand]
+    py::class_<PCNNrand>(m, "PCNNrand")
+        .def(py::init<int, int, float, float,
+             float, float, float, float, \
+             int, float, RandLayer, std::string>(),
+             py::arg("N"),
+             py::arg("Nj"),
+             py::arg("gain"),
+             py::arg("offset"),
+             py::arg("clip_min"),
+             py::arg("threshold"),
+             py::arg("rep_threshold"),
+             py::arg("rec_threshold"),
+             py::arg("num_neighbors"),
+             py::arg("trace_tau"),
+             py::arg("xfilter"),
+             py::arg("name"))
+        .def("__call__", &PCNNrand::call,
+             py::arg("x"),
+             py::arg("frozen") = false,
+             py::arg("traced") = true)
+        .def("__str__", &PCNNrand::str)
+        .def("__len__", &PCNNrand::len)
+        .def("__repr__", &PCNNrand::repr)
+        .def("update", &PCNNrand::update)
+        .def("ach_modulation", &PCNNrand::ach_modulation,
+             py::arg("ach"))
+        .def("get_size", &PCNNrand::get_size)
+        .def("get_trace", &PCNNrand::get_trace)
+        .def("get_wff", &PCNNrand::get_wff)
+        .def("get_wrec", &PCNNrand::get_wrec)
+        .def("get_connectivity", &PCNNrand::get_connectivity)
+        .def("get_delta_update", &PCNNrand::get_delta_update)
+        .def("get_centers", &PCNNrand::get_centers)
+        .def("fwd_ext", &PCNNrand::fwd_ext,
+             py::arg("x"))
+        .def("fwd_int", &PCNNrand::fwd_int,
+             py::arg("a"));
+
+
     // (InputFilter) Place Cell Layer
     py::class_<PCLayer>(m, "PCLayer")
         .def(py::init<int, float, std::array<float, 4>>(),
@@ -42,7 +82,7 @@ PYBIND11_MODULE(pclib, m) {
     py::class_<PCNN>(m, "PCNN")
         .def(py::init<int, int, float, float,
              float, float, float, float, \
-             int, float, RandLayer, std::string>(),
+             int, float, PCLayer, std::string>(),
              py::arg("N"),
              py::arg("Nj"),
              py::arg("gain"),

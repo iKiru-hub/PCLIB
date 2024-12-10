@@ -839,3 +839,29 @@ def k_most_neighbors(M: np.ndarray, k: int):
 
     return M
 
+
+
+
+def make_orthonormal(matrix):
+    v1, v2 = matrix.T
+    v2 = v2 - (v1 @ v2) / (v1 @ v1) * v1
+    matrix[:, 0] = v1
+    matrix[:, 1] = v2
+    for i in range(len(matrix.T)):
+        matrix[i, :] /= matrix[i, :].sum()
+    return matrix
+
+    for i in range(len(matrix)):
+        if matrix[i, 1] < 0:
+            if np.random.random() < 0.5:
+                matrix[i, 1] = 0
+            else:
+                matrix[i, 1] *= -1
+                matrix[i, 0] = 0
+
+    return matrix
+
+
+
+
+

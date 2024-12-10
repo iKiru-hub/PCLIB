@@ -30,7 +30,7 @@ void DEBUG(const std::string& msg) {
 }
 
 
-/* PCNN */
+/* PCNN Rand */
 
 class RandLayer {
 
@@ -73,33 +73,25 @@ private:
     // the Gram-Schmidt process
     void compute_matrix() {
 
+        /* size_t n = N; */
+        /* std::array<std::array<float, n>, 2> matrix = utils::make_orthonormal_matrix<2, n>(); */
+
         // define two random vectors of length N
         // in the range [0, 1]
-        Eigen::VectorXf v1 = (Eigen::VectorXf::Random(N) + \
-            Eigen::VectorXf::Ones(N)) / 2;
-        Eigen::VectorXf v2 = (Eigen::VectorXf::Random(N) + \
-            Eigen::VectorXf::Ones(N)) / 2;
+        Eigen::VectorXf v1 = (Eigen::VectorXf::Random(N) + Eigen::VectorXf::Ones(N)) / 2;
+        Eigen::VectorXf v2 = (Eigen::VectorXf::Random(N) + Eigen::VectorXf::Ones(N)) / 2;
 
-        // dot products
+        // Compute dot products
         float multiplier = v1.dot(v2) / v1.dot(v1);
         Eigen::VectorXf v2_orth = v2 - multiplier * v1;
 
-        // no negative entries:
-        /* for (int i = 0; i < N; i++) { */
-        /*     if (v2_orth(i) < 0) { */
+        // compute the sum of v1
+        float sum = v1.sum();
+        float sum_orth = v2_orth.sum();
 
-        /*         // randomly select one option */
-        /*         // 1) set to zero */
-        /*         // 2) flip the sign and zero */
-        /*         // the other vector */
-        /*         if (utils::random.get_random_float() > 0.5) { */
-        /*             v2_orth(i) = 0.0; */
-        /*         } else { */
-        /*             v2_orth(i) = -v2_orth(i); */
-        /*             v1(i) = 0.0; */
-        /*         } */
-        /*     } */
-        /* } */
+        // normalize the vectors
+        v1 = v1 / sum;
+        v2_orth = v2_orth / sum_orth;
 
         // define final matrix
         matrix = Eigen::MatrixXf::Zero(N, 2);
@@ -110,83 +102,9 @@ private:
 };
 
 
-class PCLayer {
-
+class PCNNrand {
 public:
-
-    PCLayer(int n, float sigma,
-            std::array<float, 4> bounds)
-        : N(std::pow(n, 2)), n(n), sigma(sigma), bounds(bounds) {
-
-        // Initialize the centers
-        centers = Eigen::MatrixXf::Zero(N, 2);
-
-        // Compute the centers
-        compute_centers();
-
-        LOG("[+] PCLayer created");
-    }
-
-    ~PCLayer() { LOG("[-] PCLayer destroyed"); }
-
-    /* @brief Call the PCLayer with a 2D input and compute
-     * the Gaussian distance to the centers
-     * @param x A 2D input to the PCLayer
-     */
-    Eigen::VectorXf call(const Eigen::Vector2f& x) {
-        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
-        for (int i = 0; i < N; i++) {
-            float dx = x(0) - centers(i, 0);
-            float dy = x(1) - centers(i, 1);
-            float dist_squared = std::pow(dx, 2) + \
-                std::pow(dy, 2);
-            y(i) = std::exp(-dist_squared / denom);
-        }
-        return y;
-    }
-
-    std::string str() { return "PCLayer"; }
-    int len() { return N; }
-    Eigen::MatrixXf get_centers() { return centers; }
-    std::string repr() {
-        return "PCLayer(n=" + std::to_string(n) + \
-            ", sigma=" + std::to_string(sigma) + \
-            ", bounds=[" + std::to_string(bounds[0]);
-    }
-
-private:
-
-    int N;
-    int n;
-    float sigma;
-    const float denom = 2 * sigma * sigma;
-    std::array<float, 4> bounds;
-    Eigen::MatrixXf centers;
-
-    void compute_centers() {
-
-        // calculate the spacing between the centers
-        // given the number of centers and the bounds
-        float x_spacing = (bounds[1] - bounds[0]) / (n - 1);
-        float y_spacing = (bounds[3] - bounds[2]) / (n - 1);
-
-        // Compute the centers
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                centers(i * n + j, 0) = bounds[0] + \
-                    i * x_spacing;
-                centers(i * n + j, 1) = bounds[2] + \
-                    j * y_spacing;
-            }
-        }
-    }
-
-};
-
-
-class PCNN {
-public:
-    PCNN(int N, int Nj, float gain, float offset,
+    PCNNrand(int N, int Nj, float gain, float offset,
          float clip_min, float threshold,
          float rep_threshold,
          float rec_threshold,
@@ -223,6 +141,8 @@ public:
         fixed_indexes = {};
     }
 
+    ~ PCNNrand() { LOG("[-] PCNNrand destroyed"); }
+
     Eigen::VectorXf call(const Eigen::Vector2f& x,
                          const bool frozen = false,
                          const bool traced = true) {
@@ -234,10 +154,12 @@ public:
         // with the feedforward weights
         u = Wff * x_filtered + pre_x;
         /* u = utils::cosine_similarity_vector_matrix( */
-                /* x_filtered, Wff); */
-        // maybe use cosine similarity?
-        u = utils::gaussian_distance(x_filtered, Wff);
+        /*         x_filtered, Wff); */
 
+        Eigen::VectorXf sigma = Eigen::VectorXf::Constant(u.size(), 0.01);
+
+        // maybe use cosine similarity?
+        u = utils::gaussian_distance(x_filtered, Wff, sigma);
         u = utils::generalized_sigmoid_vec(u, offset,
                                            gain, clip_min);
 
@@ -369,6 +291,347 @@ private:
     float ach;
 
     RandLayer xfilter;
+
+    // variables
+    Eigen::MatrixXf Wff;
+    Eigen::MatrixXf Wffbackup;
+    float delta_wff;
+    Eigen::MatrixXf Wrec;
+    Eigen::MatrixXf connectivity;
+    /* Eigen::MatrixXf centers; */
+    Eigen::VectorXf mask;
+    std::vector<int> fixed_indexes;
+    std::vector<int> free_indexes;
+    int cell_count;
+    Eigen::VectorXf u;
+    Eigen::VectorXf x_filtered;
+    Eigen::VectorXf trace;
+    Eigen::VectorXf pre_x;
+
+    // @brief check if one of the fixed neurons
+    int check_fixed_indexes() {
+
+        // if there are no fixed neurons, return -1
+        if (fixed_indexes.size() == 0) {
+            return -1;
+        };
+
+        // loop through the fixed indexes's `u` value
+        // and return the index with the highest value
+        int max_idx = -1;
+        float max_u = 0.0;
+        for (int i = 0; i < fixed_indexes.size(); i++) {
+            if (u(fixed_indexes[i]) > max_u) {
+                max_u = u(fixed_indexes[i]);
+                max_idx = fixed_indexes[i];
+            };
+        };
+
+        if (max_u < (threshold * ach) ) { return -1; }
+        else {
+            DEBUG("Fixed index above threshold: " + \
+                std::to_string(max_u) + \
+                " [" + std::to_string(threshold) + "]");
+            return max_idx; };
+    }
+
+    // @brief Quantify the indexes.
+    void make_indexes() {
+
+        free_indexes.clear();
+        for (int i = 0; i < N; i++) {
+            if (Wff.row(i).sum() > threshold) {
+                fixed_indexes.push_back(i);
+            } else {
+                free_indexes.push_back(i);
+            }
+        }
+    }
+
+    // @brief calculate the recurrent connections
+    void update_recurrent() {
+        // connectivity matrix
+        connectivity = utils::connectivity_matrix(
+            Wff, rec_threshold
+        );
+
+        // similarity
+        Wrec = utils::cosine_similarity_matrix(Wff);
+
+        // weights
+        Wrec = Wrec.cwiseProduct(connectivity);
+    }
+
+};
+
+
+/* PCNN */
+
+
+class PCLayer {
+
+public:
+
+    PCLayer(int n, float sigma,
+            std::array<float, 4> bounds)
+        : N(std::pow(n, 2)), n(n), sigma(sigma), bounds(bounds) {
+
+        // Initialize the centers
+        centers = Eigen::MatrixXf::Zero(N, 2);
+
+        // Compute the centers
+        compute_centers();
+
+        LOG("[+] PCLayer created");
+    }
+
+    ~PCLayer() { LOG("[-] PCLayer destroyed"); }
+
+    /* @brief Call the PCLayer with a 2D input and compute
+     * the Gaussian distance to the centers
+     * @param x A 2D input to the PCLayer
+     */
+    Eigen::VectorXf call(const Eigen::Vector2f& x) {
+        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
+        for (int i = 0; i < N; i++) {
+            float dx = x(0) - centers(i, 0);
+            float dy = x(1) - centers(i, 1);
+            float dist_squared = std::pow(dx, 2) + \
+                std::pow(dy, 2);
+            y(i) = std::exp(-dist_squared / denom);
+        }
+        return y;
+    }
+
+    std::string str() { return "PCLayer"; }
+    int len() { return N; }
+    Eigen::MatrixXf get_centers() { return centers; }
+    std::string repr() {
+        return "PCLayer(n=" + std::to_string(n) + \
+            ", sigma=" + std::to_string(sigma) + \
+            ", bounds=[" + std::to_string(bounds[0]);
+    }
+
+private:
+
+    int N;
+    int n;
+    float sigma;
+    const float denom = 2 * sigma * sigma;
+    std::array<float, 4> bounds;
+    Eigen::MatrixXf centers;
+
+    void compute_centers() {
+
+        // calculate the spacing between the centers
+        // given the number of centers and the bounds
+        float x_spacing = (bounds[1] - bounds[0]) / (n - 1);
+        float y_spacing = (bounds[3] - bounds[2]) / (n - 1);
+
+        // Compute the centers
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                centers(i * n + j, 0) = bounds[0] + \
+                    i * x_spacing;
+                centers(i * n + j, 1) = bounds[2] + \
+                    j * y_spacing;
+            }
+        }
+    }
+
+};
+
+
+class PCNN {
+public:
+    PCNN(int N, int Nj, float gain, float offset,
+         float clip_min, float threshold,
+         float rep_threshold,
+         float rec_threshold,
+         int num_neighbors, float trace_tau,
+         PCLayer xfilter, std::string name = "2D")
+        : N(N), Nj(Nj), gain(gain), offset(offset),
+        clip_min(clip_min), threshold(threshold),
+        rep_threshold(rep_threshold),
+        rec_threshold(rec_threshold),
+        num_neighbors(num_neighbors),
+        trace_tau(trace_tau),
+        xfilter(std::move(xfilter)),
+        name(name) {
+
+        // Initialize the variables
+        Wff = Eigen::MatrixXf::Zero(N, Nj);
+        Wffbackup = Eigen::MatrixXf::Zero(N, Nj);
+        Wrec = Eigen::MatrixXf::Zero(N, N);
+        connectivity = Eigen::MatrixXf::Zero(N, N);
+        mask = Eigen::VectorXf::Zero(N);
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        delta_wff = 0.0;
+        x_filtered = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+        cell_count = 0;
+
+        ach = 1.0;
+
+        // make vector of free indexes
+        for (int i = 0; i < N; i++) {
+            free_indexes.push_back(i);
+        }
+        fixed_indexes = {};
+    }
+
+    ~PCNN() { LOG("[-] PCNN destroyed"); }
+
+    Eigen::VectorXf call(const Eigen::Vector2f& x,
+                         const bool frozen = false,
+                         const bool traced = true) {
+
+        // pass the input through the filter layer
+        x_filtered = xfilter.call(x);
+
+        // forward it to the network by doing a dot product
+        // with the feedforward weights
+        u = Wff * x_filtered + pre_x;
+        u = utils::cosine_similarity_vector_matrix(
+                x_filtered, Wff);
+
+        Eigen::VectorXf sigma = Eigen::VectorXf::Constant(u.size(), 0.01);
+
+        // maybe use cosine similarity?
+        /* u = utils::gaussian_distance(x_filtered, Wff, sigma); */
+
+        u = utils::generalized_sigmoid_vec(u, offset,
+                                           gain, clip_min);
+
+        // update the trace
+        if (traced) {
+            trace = (1 - trace_tau) * trace + trace_tau * u;
+        }
+
+        // update model
+        /* if (!frozen) { */
+        /*     update(x_filtered); */
+        /* } */
+
+        return u;
+    }
+
+    // @brief update the model
+    void update() {
+
+        make_indexes();
+
+        // exit: a fixed neuron is above threshold
+        if (check_fixed_indexes() != -1) {
+            DEBUG("!Fixed index above threshold");
+           return void();
+        };
+
+        // exit: there are no free neurons
+        if (free_indexes.size() == 0) {
+            DEBUG("!No free neurons");
+            return void();
+        };
+
+        // pick new index
+        int idx = utils::random.get_random_element_vec(
+                                        free_indexes);
+        DEBUG("Picked index: " + std::to_string(idx));
+
+        // determine weight update
+        Eigen::VectorXf dw = x_filtered - Wff.row(idx).transpose();
+        delta_wff = dw.norm();
+
+        if (delta_wff > 0.0) {
+
+            DEBUG("delta_wff: " + std::to_string(delta_wff));
+
+            // update weights
+            Wff.row(idx) += dw.transpose();
+
+            // calculate the similarity among the rows
+            float similarity = \
+                utils::max_cosine_similarity_in_rows(
+                    Wff, idx);
+
+            // check repulsion (similarity) level
+            if (similarity > (rep_threshold * ach)) {
+                Wff.row(idx) = Wffbackup.row(idx);
+                return void();
+            }
+
+            // update count and backup
+            cell_count++;
+            Wffbackup.row(idx) = Wff.row(idx);
+
+            // update recurrent connections
+            update_recurrent();
+
+        }
+
+    }
+
+   Eigen::VectorXf fwd_ext(const Eigen::Vector2f& x) {
+        return call(x, true, false);
+    }
+
+   Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
+        return Wrec * a + pre_x;
+    }
+
+    void reset() {
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+    }
+
+    // Getters
+    int len() const { return cell_count; }
+    int get_size() const { return N; }
+    std::string str() const { return "PCNN." + name; }
+    std::string repr() const {
+        return "PCNN(" + name + std::to_string(N) + \
+            std::to_string(Nj) + std::to_string(gain) + \
+            std::to_string(offset) + \
+            std::to_string(rec_threshold) + \
+            std::to_string(num_neighbors) + \
+            std::to_string(trace_tau) + ")";
+    }
+    Eigen::VectorXf representation() const { return u; }
+    Eigen::MatrixXf get_wff() const { return Wff; }
+    Eigen::MatrixXf get_wrec() const { return Wrec; }
+    Eigen::MatrixXf get_connectivity() const { return connectivity; }
+    Eigen::VectorXf get_trace() const { return trace; }
+    float get_delta_update() const { return delta_wff; }
+
+    Eigen::MatrixXf get_centers() {
+        return utils::calc_centers_from_layer(
+            Wff, xfilter.get_centers());
+    }
+
+    // @brief modulate the density of new PCs
+    void ach_modulation(float ach) {
+        this->ach = ach;
+    }
+
+private:
+    // parameters
+    const int N;
+    const int Nj;
+    const float gain;
+    const float offset;
+    const float clip_min;
+    const float threshold;
+    const float rep_threshold;
+    const float rec_threshold;
+    const int num_neighbors;
+    const float trace_tau;
+    const std::string name;
+
+    float ach;
+
+    PCLayer xfilter;
 
     // variables
     Eigen::MatrixXf Wff;
@@ -907,8 +1170,8 @@ void test_pcnn() {
     int n = 3;
     int Nj = std::pow(n, 2);
 
-    /* PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0}); */
-    RandLayer xfilter = RandLayer(Nj);
+    PCLayer xfilter = PCLayer(n, 0.1, {0.0, 1.0, 0.0, 1.0});
+    /* RandLayer xfilter = RandLayer(Nj); */
     LOG(xfilter.str());
 
     PCNN model = PCNN(3, Nj, 10., 0.1, 0.4, 0.1, 0.1,

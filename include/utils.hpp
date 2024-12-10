@@ -197,24 +197,11 @@ void log_hello() {
 
 namespace utils {
 
-//
-template <std::size_t N>
-int arr_argmax(std::array<float, N> arr) {
 
-    // Get iterator to the maximum element
-    auto max_it = std::max_element(arr.begin(), arr.end());
+/* ---| ACTIVATION FUNCTIONS |-- */
 
-    // Calculate the index
-    return std::distance(arr.begin(), max_it);
-}
 
-/* @brief: Generalized sigmoid function
- * @param x: input vector
- * @param offset: offset parameter
- * @param gain: gain parameter
- * @param clip: clip parameter
- * @return: sigmoid output : Eigen::Vector2d
- */
+// @brief: Generalized sigmoid function
 inline Eigen::VectorXf generalized_sigmoid_vec(
     const Eigen::VectorXf& x,
     float offset = 1.0f,
@@ -242,43 +229,31 @@ float generalized_sigmoid(const float& x,
 }
 
 // @brief Calculate a generalized tanh function with offset, gain, and clipping.
-/// @param x Input value.
-/// @param offset Offset to subtract from x before applying tanh.
-/// @param gain Gain factor to scale the input after offset.
-/// @param clip Minimum threshold for the result; values below this are set to 0.
-/// @return The calculated tanh value or 0 if below the clip threshold.
 float generalized_tanh(float x, float offset = 0.0f,
                        float gain = 1.0f) {
     // Offset the input, apply gain, and compute tanh
     return std::tanh(gain * (x - offset));
 }
+
+
+/* ---| VECTOR FUNCTIONS |--- */
+
+
+// @brief: get the index of the maximum element in an array
+template <std::size_t N>
+int arr_argmax(std::array<float, N> arr) {
+
+    // Get iterator to the maximum element
+    auto max_it = std::max_element(arr.begin(), arr.end());
+
+    // Calculate the index
+    return std::distance(arr.begin(), max_it);
+}
+
 // @brief cosine similarity
 inline float cosine_similarity_vec(const Eigen::VectorXf& v1,
                                    const Eigen::VectorXf& v2) {
     return v1.dot(v2) / (v1.norm() * v2.norm());
-}
-
-// @brief cosine similarity for a matrix
-Eigen::MatrixXf cosine_similarity_matrix(
-    const Eigen::MatrixXf& matrix) {
-
-    int n = matrix.rows();
-    Eigen::MatrixXf similarity_matrix(n, n);
-
-    // Normalize each row to unit norm
-    Eigen::MatrixXf normalized_matrix = matrix.rowwise().normalized();
-
-    // set NaN values to zero
-    normalized_matrix = (normalized_matrix.array().isNaN()).select(
-        Eigen::MatrixXf::Zero(n, n), normalized_matrix);
-
-    // Compute the cosine similarity (normalized dot product)
-    similarity_matrix = normalized_matrix * normalized_matrix.transpose();
-
-    // take out the diagonal
-    similarity_matrix.diagonal().setZero();
-
-    return similarity_matrix;
 }
 
 // @brief cosine similarity between a vector and each
@@ -308,21 +283,46 @@ Eigen::VectorXf cosine_similarity_vector_matrix(
     return similarity_vector;
 }
 
+// @brief cosine similarity for a matrix
+Eigen::MatrixXf cosine_similarity_matrix(
+    const Eigen::MatrixXf& matrix) {
+
+    int n = matrix.rows();
+    Eigen::MatrixXf similarity_matrix(n, n);
+
+    // Normalize each row to unit norm
+    Eigen::MatrixXf normalized_matrix = matrix.rowwise().normalized();
+
+    // set NaN values to zero
+    normalized_matrix = (normalized_matrix.array().isNaN()).select(
+        Eigen::MatrixXf::Zero(n, n), normalized_matrix);
+
+    // Compute the cosine similarity (normalized dot product)
+    similarity_matrix = normalized_matrix * normalized_matrix.transpose();
+
+    // take out the diagonal
+    similarity_matrix.diagonal().setZero();
+
+    return similarity_matrix;
+}
+
 // @brief: calculate the Gaussian distance between a vector
 // and a matrix of vectors
 Eigen::VectorXf gaussian_distance(
     const Eigen::VectorXf& x,
     const Eigen::MatrixXf& y,
     const Eigen::VectorXf& sigma) {
+    // Validate input dimensions
+    assert(x.size() == y.cols() && "Input vector dimension must match matrix columns");
+    assert(sigma.size() == y.cols() && "Sigma vector dimension must match matrix columns");
 
     // Calculate the squared Euclidean distance
     Eigen::MatrixXf diff = y.rowwise() - x.transpose();
 
     // Calculate the squared Euclidean distance
     // and divide by the squared sigma
-    // to get the Gaussian distance
-    Eigen::VectorXf distance = \
-        diff.array().square().rowwise().sum().array() / \
+    Eigen::VectorXf distance =
+        diff.array().square().rowwise().sum().array() /
         sigma.array().square();
 
     return distance;
@@ -347,6 +347,10 @@ float max_cosine_similarity_in_rows(
 
     return max_similarity;
 }
+
+
+/* ---| MATRIX FUNCTIONS |--- */
+
 
 // @brief calculate the connectivity given a matrix
 Eigen::MatrixXf connectivity_matrix(
@@ -409,6 +413,109 @@ Eigen::MatrixXf k_highest_neighbors(
     return result;
 }
 
+// @brief: fill a matrix with random values
+void fill_random(Eigen::MatrixXf &M, float sparsity = 0.0) {
+
+    // make random generator
+    RandomGenerator random = RandomGenerator();
+
+    for (size_t i = 0; i < M.rows(); i++) {
+        for (size_t j = 0; j < M.cols(); j++) {
+            if (random.get_random_float() > sparsity) {
+                M(i, j) = random.get_random_float();
+            }
+        }
+    }
+}
+
+// @brief: make an row-orthonormal matrix
+template<size_t num_rows, size_t num_cols>
+std::array<std::array<float, num_cols>, num_rows> make_orthonormal_matrix() {
+
+    std::array<std::array<float, num_cols>, num_rows> matrix = {};
+
+    // Dot product function
+    auto dot_ = [](const std::array<float, num_cols>& v1,
+                   const std::array<float, num_cols>& v2) -> float {
+        float result = 0.0f;
+        for (size_t j = 0; j < num_cols; ++j) {
+            result += v1[j] * v2[j];
+        }
+        return result;
+    };
+
+    // Normalize function
+    auto normalize = [&dot_](std::array<float,
+                             num_cols>& v) -> void {
+
+        // Calculate L2 norm (Euclidean length)
+        float norm = std::sqrt(dot_(v, v));
+
+        // Prevent division by zero
+        if (std::abs(norm) > 1e-6) {
+            for (size_t i = 0; i < num_cols; i++) {
+                v[i] /= norm;
+            }
+        }
+    };
+
+    RandomGenerator random = RandomGenerator();
+
+    // Loop over matrix's rows
+    for (size_t i = 0; i < num_rows; i++) {
+
+        // New vector (currently using constant value)
+        std::array<float, num_cols> v;
+        for (size_t j = 0; j < num_cols; j++) {
+            v[j] = random.get_random_float();
+        }
+
+        // Assign first vector
+        if (i == 0) {
+            normalize(v);
+            matrix[i] = v;
+            continue;
+        }
+
+        // Gram-Schmidt orthogonalization
+        std::array<float, num_cols> proj_v = {};
+        for (size_t k = 0; k < i; k++) {
+            std::array<float, num_cols> u = matrix[k];
+            float proj = dot_(v, u) / dot_(u, u);
+
+            for (size_t j = 0; j < num_cols; j++) {
+                proj_v[j] += proj * u[j];
+            }
+        }
+
+        // Update v
+        for (size_t j = 0; j < num_cols; j++) {
+            v[j] -= proj_v[j];
+        }
+
+        normalize(v);
+        matrix[i] = v;
+    }
+
+    return matrix;
+}
+
+
+template <std::size_t N, std::size_t M>
+Eigen::MatrixXf array_to_eigen_matrix(const std::array<std::array<float, M>, N>& arr) {
+    Eigen::MatrixXf mat(N, M);
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = 0; j < M; ++j) {
+            mat(i, j) = arr[i][j];
+        }
+    }
+    return mat;
+}
+
+
+/* ---| MISCELLANEOUS |--- */
+
+
 // @brief: given a weight matrix and a set of centers,
 // calculate the new centers based on the weighted
 // average of the inputs
@@ -443,7 +550,6 @@ Eigen::MatrixXf calc_centers_from_layer(
 
 // @brief: calculate a position given an activity vector,
 // a list of associated centers, and their indexes
-
 Eigen::Vector2f calculate_position(
     const Eigen::VectorXf& a, const Eigen::MatrixXf& centers,
     const Eigen::VectorXf& indexes)
@@ -478,28 +584,15 @@ Eigen::Vector2f calculate_position(
     return position;
 }
 
-/* @brief: fill a matrix with random values
- * @param M: matrix to fill
- * @param sparsity: sparsity of the matrix
- */
-void fill_random(Eigen::MatrixXf &M, float sparsity = 0.0) {
 
-    // make random generator
-    RandomGenerator random = RandomGenerator();
+/* ---| OBJECTS |--- */
 
-    for (size_t i = 0; i < M.rows(); i++) {
-        for (size_t j = 0; j < M.cols(); j++) {
-            if (random.get_random_float() > sparsity) {
-                M(i, j) = random.get_random_float();
-            }
-        }
-    }
-}
-
-// objects
 
 Logger logging = Logger();
 RandomGenerator random = RandomGenerator();
+
+
+/* ---| TESTS |--- */
 
 
 void test_random_1() {
@@ -593,5 +686,25 @@ void test_make_position() {
     logging.log("Position: ");
     logging.log_vector(position);
 }
+
+
+template<size_t num_rows, size_t num_cols>
+void test_orth_matrix() {
+
+    std::array<std::array<float, num_cols>, num_rows> matrix = make_orthonormal_matrix<num_rows, num_cols>();
+
+    std::cout << "Testing orthonormal matrix" << "\n";
+
+    std::cout << std::to_string(num_rows) << ", ";
+    std::cout << std::to_string(num_cols) << "\n";
+
+    for (size_t i = 0; i < num_rows; i++) {
+        std::cout << "\n";
+        for (size_t j = 0; j < num_cols; j++) {
+            std::cout << std::to_string(matrix[i][j]) << " ";
+        }
+    }
+}
+
 
 }
