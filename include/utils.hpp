@@ -15,6 +15,10 @@ class Logger;
 class RandomGenerator;
 
 
+/* ========================================== */
+/* ================ PRIVATE =================
+/* ========================================== */
+
 /* LOGGING */
 
 
@@ -193,12 +197,16 @@ void log_hello() {
 }
 
 
+/* ========================================== */
+/* ========================================== */
 /* NAMESPACE */
 
 namespace utils {
 
 
-/* ---| ACTIVATION FUNCTIONS |-- */
+/* ========================================== */
+/* ========== ACTIVATION FUNCTIONS ========== */
+/* ========================================== */
 
 
 // @brief: Generalized sigmoid function
@@ -236,7 +244,9 @@ float generalized_tanh(float x, float offset = 0.0f,
 }
 
 
-/* ---| VECTOR FUNCTIONS |--- */
+/* ========================================== */
+/* =========== VECTOR FUNCTIONS ============= */
+/* ========================================== */
 
 
 // @brief: get the index of the maximum element in an array
@@ -348,9 +358,34 @@ float max_cosine_similarity_in_rows(
     return max_similarity;
 }
 
+// @brief: linspace [from stackoverflow]
+Eigen::VectorXf linspace(float start, float end, int num)
+{
+    /* int num = num; // Ensure `num` is an integer */
 
-/* ---| MATRIX FUNCTIONS |--- */
+    if (num <= 0) {
+        return Eigen::VectorXf(); // Return an empty vector
+    }
 
+    if (num == 1) {
+        Eigen::VectorXf linspaced(1);
+        linspaced(0) = start;
+        return linspaced;
+    }
+
+    Eigen::VectorXf linspaced(num);
+    float delta = (end - start) / (num - 1);
+
+    for (int i = 0; i < num; ++i) {
+        linspaced(i) = start + delta * i;
+    }
+
+    return linspaced;
+}
+
+/* ========================================== */
+/* ============ MATRIX FUNCTIONS ============ */
+/* ========================================== */
 
 // @brief calculate the connectivity given a matrix
 Eigen::MatrixXf connectivity_matrix(
@@ -513,8 +548,9 @@ Eigen::MatrixXf array_to_eigen_matrix(const std::array<std::array<float, M>, N>&
 }
 
 
-/* ---| MISCELLANEOUS |--- */
-
+/* ========================================== */
+/* ============= MISCELLANEOUS ============== */
+/* ========================================== */
 
 // @brief: given a weight matrix and a set of centers,
 // calculate the new centers based on the weighted
@@ -585,15 +621,17 @@ Eigen::Vector2f calculate_position(
 }
 
 
-/* ---| OBJECTS |--- */
+/* ========================================== */
+/* ================ OBJECTS ================= */
+/* ========================================== */
 
 
 Logger logging = Logger();
 RandomGenerator random = RandomGenerator();
 
-
-/* ---| TESTS |--- */
-
+/* ========================================== */
+/* ================= TESTS ================== */
+/* ========================================== */
 
 void test_random_1() {
 

@@ -44,6 +44,9 @@ public:
         // assert N is a perfect square
         assert(std::sqrt(N) == std::floor(std::sqrt(N)));
         this->N = N;
+
+        // Initialize the centers
+        basis = Eigen::MatrixXf::Zero(N, 2);
     }
 
     virtual ~InputLayer() { LOG("[-] InputLayer destroyed"); }
@@ -52,7 +55,7 @@ public:
     std::string str() { return "InputLayer"; }
     std::string repr() { return str() + "(N=" + \
         std::to_string(N) + ")"; }
-    Eigen::MatrixXf get_centers() { return centers; };
+    Eigen::MatrixXf get_centers() { return basis; };
 
     int len() { return N; }
 
@@ -61,7 +64,7 @@ private:
 
 protected:
     int N;
-    Eigen::MatrixXf centers;
+    Eigen::MatrixXf basis;
 
 };
 
@@ -75,27 +78,20 @@ public:
         : InputLayer(n*n), n(n), sigma(sigma),
         bounds(bounds) {
 
-
-        // Initialize the centers
-        centers = Eigen::MatrixXf::Zero(N, 2);
-
         // Compute the centers
         make_tuning();
-
         LOG("[+] PCLayer created");
     }
 
     ~PCLayer(){ LOG("[-] PCLayer destroyed"); }
 
-    /* @brief Call the PCLayer with a 2D input and compute
-     * the Gaussian distance to the centers
-     * @param x A 2D input to the PCLayer
-     */
+    // @brief Call the PCLayer with a 2D input and compute
+    // the Gaussian distance to the centers
     Eigen::VectorXf call(const Eigen::Vector2f& x) {
         Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
         for (int i = 0; i < N; i++) {
-            float dx = x(0) - centers(i, 0);
-            float dy = x(1) - centers(i, 1);
+            float dx = x(0) - basis(i, 0);
+            float dy = x(1) - basis(i, 1);
             float dist_squared = std::pow(dx, 2) + \
                 std::pow(dy, 2);
             y(i) = std::exp(-dist_squared / denom);
@@ -104,22 +100,13 @@ public:
     }
 
     std::string str() { return "PCLayer"; }
-    /* int len() { return N; } */
-    /* Eigen::MatrixXf get_centers() { return centers; } */
-    /* std::string repr() { */
-    /*     return "PCLayer(n=" + std::to_string(n) + \ */
-    /*         ", sigma=" + std::to_string(sigma) + \ */
-    /*         ", bounds=[" + std::to_string(bounds[0]); */
-    /* } */
 
 private:
 
-    /* int N; */
     int n;
     float sigma;
     const float denom = 2 * sigma * sigma;
     std::array<float, 4> bounds;
-    Eigen::MatrixXf centers;
 
     void make_tuning() {
 
@@ -131,9 +118,9 @@ private:
         // Compute the centers
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
-                centers(i * n + j, 0) = bounds[0] + \
+                basis(i * n + j, 0) = bounds[0] + \
                     i * x_spacing;
-                centers(i * n + j, 1) = bounds[2] + \
+                basis(i * n + j, 1) = bounds[2] + \
                     j * y_spacing;
             }
         }
@@ -142,15 +129,14 @@ private:
 };
 
 
-class RandLayer {
+class RandLayer : public InputLayer {
 
 public:
 
-    RandLayer(int N): N(N) {
+    RandLayer(int N): InputLayer(N) {
 
-        // Compute the centers
-        compute_matrix();
-
+        // make matrix
+        make_tuning();
         LOG("[+] RandLayer created");
     }
 
@@ -161,35 +147,29 @@ public:
     Eigen::VectorXf call(const Eigen::Vector2f& x) {
         Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
         for (int i = 0; i < N; i++) {
-            y(i) = matrix.row(i).dot(x);
+            y(i) = basis.row(i).dot(x);
         }
         return y;
     }
 
     std::string str() { return "RandLayer"; }
-    int len() { return N; }
-    Eigen::MatrixXf get_centers() { return matrix; }
-    std::string repr() {
-        return "RandLayer(n=" + std::to_string(N) + ")";
-    }
 
 private:
-
-    int N;
-    Eigen::MatrixXf matrix;
 
     // @brief calculate the basis of a linear projection
     // 2D -> nD as set of orthogonal vectors through
     // the Gram-Schmidt process
-    void compute_matrix() {
+    void make_tuning() {
 
         /* size_t n = N; */
         /* std::array<std::array<float, n>, 2> matrix = utils::make_orthonormal_matrix<2, n>(); */
 
         // define two random vectors of length N
         // in the range [0, 1]
-        Eigen::VectorXf v1 = (Eigen::VectorXf::Random(N) + Eigen::VectorXf::Ones(N)) / 2;
-        Eigen::VectorXf v2 = (Eigen::VectorXf::Random(N) + Eigen::VectorXf::Ones(N)) / 2;
+        Eigen::VectorXf v1 = (Eigen::VectorXf::Random(N) + \
+            Eigen::VectorXf::Ones(N)) / 2;
+        Eigen::VectorXf v2 = (Eigen::VectorXf::Random(N) + \
+            Eigen::VectorXf::Ones(N)) / 2;
 
         // Compute dot products
         float multiplier = v1.dot(v2) / v1.dot(v1);
@@ -204,9 +184,63 @@ private:
         v2_orth = v2_orth / sum_orth;
 
         // define final matrix
-        matrix = Eigen::MatrixXf::Zero(N, 2);
-        matrix.col(0) = v1;
-        matrix.col(1) = v2_orth;
+        basis.col(0) = v1;
+        basis.col(1) = v2_orth;
+    }
+
+};
+
+
+class GridLayer : public InputLayer {
+
+public:
+
+    GridLayer(int N, float sigma, float speed):
+        InputLayer(N), sigma(sigma), speed(speed) {
+
+        // make matrix
+        make_tuning();
+        LOG("[+] GridLayer created");
+    }
+    ~GridLayer() { LOG("[-] GridLayer destroyed"); }
+
+    // @brief Call the RandLayer with a 2D input and
+    // apply a the layer's linear projection
+    Eigen::VectorXf call(const Eigen::Vector2f& x) {
+    }
+
+    std::string str() { return "GridLayer"; }
+
+private:
+    float sigma;
+    float speed;
+
+    // define the offset of the gc centers
+    void make_tuning() {
+
+        int n = static_cast<int>(std::sqrt(N));
+        if (n*n != N) {
+            LOG("WARNING: downsizing to " + \
+                std::to_string(n*n));
+            this-> N = n*n;
+            basis = Eigen::MatrixXf::Zero(N, 2);
+        }
+
+        float dx = 1.0f / static_cast<float>(n);
+
+        basis = Eigen::MatrixXf::Zero(N, 2);
+        Eigen::VectorXf xeven = utils::linspace(dx, 1.0f-2*dx, n);
+        Eigen::VectorXf xodd = utils::linspace(2*dx, 1.0f-dx, n);
+        Eigen::VectorXf y = utils::linspace(dx, 1.0f-2*dx, n);
+
+        for (std::size_t i=0; i<N; i++) {
+            if (i / n % 2 == 0){
+                basis(i, 0) = xeven(i % n);
+            } else {
+                basis(i, 0) = xodd(i % n);
+            }
+            basis(i, 1) = y(i / n);
+        }
     }
 
 };
@@ -1251,6 +1285,7 @@ void test_pcnn() {
     SPACE("#---#");
 }
 
+
 void test_randlayer() {
 
     SPACE("#---#");
@@ -1276,4 +1311,12 @@ void test_randlayer() {
     SPACE("#---#");
 }
 
+
+void test_gridlayer() {
+
+    GridLayer gc(16, 0.1, 0.2);
+    /* printf(gc.str()); */
+
+    utils::logging.log_matrix(gc.get_centers());
+}
 };

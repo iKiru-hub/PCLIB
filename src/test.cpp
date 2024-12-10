@@ -16,19 +16,23 @@ int main() {
 
     /* testSampling(); */
     /* testLeaky(); */
-    /* pcl::test_layer(); */
 
-    /* pcl::test_pcnn(); */
+    /* from utils.hpp
     /* utils::test_random_1(); */
     /* /1* utils::test_max_cosine(); *1/ */
     /* utils::test_connectivity(); */
     /* utils::test_make_position(); */
-    /* pcl::test_randlayer(); */
-    utils::test_orth_matrix<2, 5>();
-
-    // test tanh
+    /* utils::test_orth_matrix<2, 5>(); */
     /* float out = utils::generalized_tanh(-1); */
     /* LOG(std::to_string(out)); */
+
+    /* from pcnn.hpp
+    /* pcl::test_layer(); */
+    /* pcl::test_pcnn(); */
+    /* pcl::test_randlayer(); */
+    pcl::test_gridlayer();
+
+    // test tanh
 
     return 0;
 }
