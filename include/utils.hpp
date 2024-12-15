@@ -321,10 +321,16 @@ Eigen::MatrixXf cosine_similarity_matrix(
 Eigen::VectorXf gaussian_distance(
     const Eigen::VectorXf& x,
     const Eigen::MatrixXf& y,
-    const Eigen::VectorXf& sigma) {
-    // Validate input dimensions
-    assert(x.size() == y.cols() && "Input vector dimension must match matrix columns");
-    assert(sigma.size() == y.cols() && "Sigma vector dimension must match matrix columns");
+    const Eigen::VectorXf& sigma,
+    const bool assert_dims = true) {
+
+    if (assert_dims) {
+        // Validate input dimensions
+        assert(x.size() == y.cols() && "Input vector" + \
+               f" dimension must match matrix columns");
+        assert(sigma.size() == y.cols() && "Sigma vector" + \
+               f" dimension must match matrix columns");
+    }
 
     // Calculate the squared Euclidean distance
     Eigen::MatrixXf diff = y.rowwise() - x.transpose();
@@ -337,6 +343,23 @@ Eigen::VectorXf gaussian_distance(
 
     return distance;
 }
+
+// @brief: calculate the exponential of the
+// Gaussian distance
+Eigen::VectorXf gaussian_distance_exp(
+    const Eigen::VectorXf& x,
+    const Eigen::MatrixXf& y,
+    const Eigen::VectorXf& sigma,
+    const bool assert_dims = true) {
+
+    // Calculate the Gaussian distance
+    Eigen::VectorXf distance = gaussian_distance(
+                        x, y, sigma, assert_dims);
+
+    // Calculate the exponential of the distance
+    return (-distance.array()).exp();
+}
+
 
 // @brief: calculate the maximum cosine similarity in a rows
 float max_cosine_similarity_in_rows(
@@ -620,6 +643,101 @@ Eigen::Vector2f calculate_position(
     return position;
 }
 
+// @brief: calculate the intersection of two lines
+// credits: stackoverflow
+int get_segments_intersection(float p0_x, float p0_y,
+                              float p1_x, float p1_y,
+                              float p2_x, float p2_y,
+                              float p3_x, float p3_y,
+                              float *i_x, float *i_y) {
+
+    float s02_x, s02_y, s10_x, s10_y, s32_x;
+    float s32_y, s_numer, t_numer, denom, t;
+    s10_x = p1_x - p0_x;
+    s10_y = p1_y - p0_y;
+    s32_x = p3_x - p2_x;
+    s32_y = p3_y - p2_y;
+
+    denom = s10_x * s32_y - s32_x * s10_y;
+    if (denom == 0)
+        return 0; // Collinear
+    bool denomPositive = denom > 0;
+
+    s02_x = p0_x - p2_x;
+    s02_y = p0_y - p2_y;
+    s_numer = s10_x * s02_y - s10_y * s02_x;
+    if ((s_numer < 0) == denomPositive)
+        return 0; // No collision
+
+    t_numer = s32_x * s02_y - s32_y * s02_x;
+    if ((t_numer < 0) == denomPositive)
+        return 0; // No collision
+
+    if (((s_numer > denom) == denomPositive) || ((t_numer > denom) == denomPositive))
+        return 0; // No collision
+    //
+    // Collision detected
+    t = t_numer / denom;
+    if (i_x != NULL)
+        *i_x = p0_x + (t * s10_x);
+    if (i_y != NULL)
+        *i_y = p0_y + (t * s10_y);
+
+    return 1;
+}
+
+
+// @brief: reflect a point over a line
+std::array<float, 2> reflect_point_over_segment(
+                    float x, float y, float x1,
+                    float y1, float x2, float y2) {
+
+    if (x1 == x2) {
+        return {2*x1 - x, y};
+    } else if (y1 == y2) {
+        return {x, 2*y1 - y};
+    }
+
+    printf("\nx1: %f, y1: %f, x2: %f, y2: %f\n", x1, y1, x2, y2);
+    printf("x: %f, y: %f\n", x, y);
+
+    // define line equation
+    float m = (y2-y1) / (x2 - x1);
+    float q = (x1-x2)*y1 + (y2-y1)*x1;
+
+    /* printf("\nm: %f, q: %f\n", m, q); */
+
+    // rotate x2,y2 around x1,y1 by 90 degrees
+    float x3 = x2 - x1;
+    float y3 = y2 - y1;
+    float _x3 = -y3 + x1;
+    float _y3 = x3 + y1;
+    printf("_x3: %f, _y3: %f\n", _x3, _y3);
+
+    float _m = (_y3 - y1) / (_x3 - x1);
+
+    // calculate q for perpendicular line
+    // y - _m*x = q
+    float _q = y - _m*x;
+    /* printf("_m: %f, _q: %f\n", _m, _q); */
+
+    // find intersection between line and perpendicular line
+    // _m * x + _q = m * x + q
+    // x = (q - _q) / (_m - m)
+    float xc = (q - _q) / (_m - m);
+    float yc = m * xc + q;
+
+    // reflect x,y over xc,yc
+    float xr = 2*xc - x;
+    float yr = 2*yc - y;
+    printf("x: %f, y: %f\n", x, y);
+    printf("m, _m: %f, %f\n", m, _m);
+    printf("q, _q: %f, %f\n", q, _q);
+    printf("xc: %f, yc: %f\n", xc, yc);
+    printf("xr: %f, yr: %f\n", xr, yr);
+
+    return {xr, yr};
+}
 
 /* ========================================== */
 /* ================ OBJECTS ================= */

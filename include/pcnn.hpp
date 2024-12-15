@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <memory>
 #include <array>
+#include <algorithm>
+#include <cstdio>
 #include <tuple>
 #include <cassert>
 
@@ -13,7 +15,7 @@
 
 // blank log function
 void LOG(const std::string& msg) {
-    /* std::cout << msg << std::endl; */
+    std::cout << msg << std::endl;
 }
 
 // DEBUGGING logs
@@ -29,6 +31,169 @@ void DEBUG(const std::string& msg) {
         std::cout << "[DEBUG] " << msg << std::endl;
     }
 }
+
+
+
+/* ========================================== */
+/* ============ local functions ============= */
+/* ========================================== */
+
+
+// @brief boundary conditions for an hexagon
+/*
+INITIALIZATION:
+- an hexagon of side 1
+- center at C=(0, 0)
+- nodes
+- apothem length 0.86602540378
+
+GIVEN:
+- point P=(x, y)
+
+PROCEDURE:
+
+% checkpoint: short distance PO < apothem
+
+% calculate the boundary conditions
+1. reflect the point wrt the center C -> R
+2. determine the two closest nodes A, B
+3. calculate the intersection S between the line
+   RO and the side of the hexagon AB
+
+% checkpoint: no intersection S, point is inside the hexagon
+
+4. reflect the point OP wrt the intersection S, this is the
+   new point P
+*/
+
+
+class Hexagon {
+
+    // center: (0, 0)
+    // side: 1
+    std::array<std::array<float, 2>, 6> centers;
+    std::array<size_t, 6> index = {0, 1, 2, 3, 4, 5};
+
+    // @brief check whether p is within the inner circle
+    bool apothem_checkpoint(float x, float y) {
+        float dist = std::sqrt(std::pow(x, 2) + \
+                               std::pow(y, 2));
+        bool within = dist < 0.86602540378f;
+        if (within) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // @brief wrap the point to the boundary
+    int wrap(float x, float y, float *p_new_x, float *p_new_y) {
+
+        // reflect the point p to r wrt the center (0, 0)
+        float rx = x * -1;
+        float ry = y * -1;
+
+        /* printf("Reflection: rx %f, ry %f\n", rx, ry); */
+
+        // calculate and sort the distances to the centers
+        std::array<float, 6> distances;
+        for (int i = 0; i < 6; i++) {
+            distances[i] = std::sqrt(std::pow(centers[i][0] - rx,
+                                              2) + \
+                                     std::pow(centers[i][1] - ry,
+                                              2));
+        }
+
+        // Sort the index array based on the
+        // values in the original array
+        std::sort(index.begin(), index.end(),
+            [&distances](const size_t& a, const size_t& b) {
+                return distances[a] < distances[b];
+            }
+        );
+
+        float ax = centers[index[0]][0];
+        float ay = centers[index[0]][1];
+        float bx = centers[index[1]][0];
+        float by = centers[index[1]][1];
+
+        //
+        /* printf("A: %f, %f\n", ax, ay); */
+        /* printf("B: %f, %f\n", bx, by); */
+        // calculate the intersection s between ab and ro
+        float sx, sy;
+        if (utils::get_segments_intersection(
+            ax, ay, bx, by, rx, ry,
+            0.0f, 0.0f, &sx, &sy)) {
+        } else {
+            // checkpoint: no intersection,
+            // point is inside the hexagon
+            /* LOG("[+] no intersection"); */
+            return 0;
+        }
+
+        // reflect the point r wrt the intersection s
+        /* *p_new_x = 2 * sx - rx; */
+        /* *p_new_y = 2 * sy - ry; */
+        rx = 2 * sx - rx;
+        ry = 2 * sy - ry;
+
+        // reflect wrt the line s-center
+        std::array<float, 2> z;
+        if (sy > 0) {
+             z = utils::reflect_point_over_segment(
+                rx, ry, 0.0f, 0.0f, sx, sy);
+        } else {
+            z = utils::reflect_point_over_segment(
+                rx, ry, sx, sy, 0.0f, 0.0f);
+        }
+
+        *p_new_x = z[0];
+        *p_new_y = z[1];
+
+        return 1;
+    }
+
+public:
+
+    Hexagon() {
+        centers[0] = {-0.5f, -0.86602540378f};
+        centers[1] = {0.5f, -0.86602540378f};
+        centers[2] = {1.0f, 0.0f};
+        centers[3] = {0.5f, 0.86602540378f};
+        centers[4] = {-0.5, 0.86602540378f};
+        centers[5] = {-1.0f, 0.0f};
+
+        LOG("[+] hexagon created");
+    }
+
+    ~Hexagon() { LOG("[-] hexagon destroyed"); }
+
+    // @brief call: apply the boundary conditions
+    std::array<float, 2> call(float x, float y) {
+
+        float new_x, new_y;
+
+        if (!apothem_checkpoint(x, y)) {
+            if (wrap(x, y, &new_x, &new_y)) {
+                /* LOG("[+] point wrapped to boundary"); */
+                return {new_x, new_y};
+            } else {
+                /* LOG("[+] point within the hexagon"); */
+                return {x, y};
+            }
+        } else {
+            /* LOG("[+] within the apothem"); */
+            return {x, y};
+        }
+    }
+
+    std::string str() { return "hexagon"; }
+    std::string repr() { return str(); }
+    std::array<std::array<float, 2>, 6> get_centers() {
+        return centers;
+    }
+};
 
 
 /* ========================================== */
@@ -47,6 +212,7 @@ public:
 
         // Initialize the centers
         basis = Eigen::MatrixXf::Zero(N, 2);
+        y = Eigen::VectorXf::Zero(N);
     }
 
     virtual ~InputLayer() { LOG("[-] InputLayer destroyed"); }
@@ -56,8 +222,9 @@ public:
     std::string repr() { return str() + "(N=" + \
         std::to_string(N) + ")"; }
     Eigen::MatrixXf get_centers() { return basis; };
+    Eigen::VectorXf get_activation() { return y; }
 
-    int len() { return N; }
+    int len() const { return N; }
 
 private:
     virtual void make_tuning() {};
@@ -65,7 +232,7 @@ private:
 protected:
     int N;
     Eigen::MatrixXf basis;
-
+    Eigen::VectorXf y;
 };
 
 
@@ -88,7 +255,6 @@ public:
     // @brief Call the PCLayer with a 2D input and compute
     // the Gaussian distance to the centers
     Eigen::VectorXf call(const Eigen::Vector2f& x) {
-        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
         for (int i = 0; i < N; i++) {
             float dx = x(0) - basis(i, 0);
             float dy = x(1) - basis(i, 1);
@@ -145,7 +311,6 @@ public:
     // @brief Call the RandLayer with a 2D input and
     // apply a the layer's linear projection
     Eigen::VectorXf call(const Eigen::Vector2f& x) {
-        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
         for (int i = 0; i < N; i++) {
             y(i) = basis.row(i).dot(x);
         }
@@ -191,58 +356,268 @@ private:
 };
 
 
+enum BoundaryType {
+    square,
+    klein,
+    circle,
+    hexagon
+};
+
+
 class GridLayer : public InputLayer {
 
 public:
 
-    GridLayer(int N, float sigma, float speed):
-        InputLayer(N), sigma(sigma), speed(speed) {
+    GridLayer(int N, float sigma, float speed,
+              std::string kind = "square"):
+        InputLayer(N), sigma(sigma), speed(speed){
+
+        this->positions = Eigen::MatrixXf::Zero(N, 2);
+
+        if (kind == "square") {
+            kind_num = BoundaryType::square;
+        } else if (kind == "klein") {
+            kind_num = BoundaryType::klein;
+        } else if (kind == "circle") {
+            kind_num = BoundaryType::circle;
+        } else if (kind == "hexagon") {
+            kind_num = BoundaryType::hexagon;
+            /* pHexagon = new Hexagon(); */
+            hexagon = Hexagon();
+        } else {
+            LOG("WARNING: unknown boundary type");
+        }
+
+        utils::logging.log("kind: " + \
+                           std::to_string(kind_num));
+        make_tuning();
 
         // make matrix
-        make_tuning();
         LOG("[+] GridLayer created");
     }
     ~GridLayer() { LOG("[-] GridLayer destroyed"); }
 
-    // @brief Call the RandLayer with a 2D input and
-    // apply a the layer's linear projection
-    Eigen::VectorXf call(const Eigen::Vector2f& x) {
+    // @brief call the GridLayer with a 2D input
+    Eigen::VectorXf call(const std::array<float, 2>& v) {
+
+        // update position with velociy
+        for (int i = 0; i < N; i++) {
+            positions(i, 0) += speed * v[0];
+            positions(i, 1) += speed * v[1];
+        }
+
+        // apply boundary conditions
+        boundary_conditions();
+
+        // compute the activation
+        calc_activation();
+        return y;
     }
 
     std::string str() { return "GridLayer"; }
+    Eigen::MatrixXf get_positions() { return positions; }
 
 private:
+    Eigen::MatrixXf positions;
     float sigma;
     float speed;
+    int kind_num;
+    /* Hexagon* pHexagon; */
+    Hexagon hexagon;
 
     // define the offset of the gc centers
     void make_tuning() {
+        switch (kind_num) {
+            case BoundaryType::square:
+                square_tuning();
+                break;
+            case BoundaryType::klein:
+                square_tuning();
+                break;
+            case BoundaryType::circle:
+                circle_tuning();
+                break;
+            case BoundaryType::hexagon:
+                square_tuning();
+                /* hexagonal_tuning(); */
+                break;
+        }
+    }
+
+    void square_tuning() {
 
         int n = static_cast<int>(std::sqrt(N));
         if (n*n != N) {
             LOG("WARNING: downsizing to " + \
                 std::to_string(n*n));
             this-> N = n*n;
-            basis = Eigen::MatrixXf::Zero(N, 2);
         }
 
-        float dx = 1.0f / static_cast<float>(n);
+        float dx = 1.0f / (static_cast<float>(n) + 0.0f);
 
-        basis = Eigen::MatrixXf::Zero(N, 2);
-        Eigen::VectorXf xeven = utils::linspace(dx, 1.0f-2*dx, n);
-        Eigen::VectorXf xodd = utils::linspace(2*dx, 1.0f-dx, n);
-        Eigen::VectorXf y = utils::linspace(dx, 1.0f-2*dx, n);
+        // define the centers as a grid excluding
+        Eigen::VectorXf y = utils::linspace(
+                        0.0f, 1.0f-dx, n);
+        Eigen::VectorXf x = utils::linspace(
+                        0.0f, 1.0f-dx, n);
+
+        utils::logging.log_vector(x);
+        utils::logging.log_vector(y);
 
         for (std::size_t i=0; i<N; i++) {
-            if (i / n % 2 == 0){
-                basis(i, 0) = xeven(i % n);
-            } else {
-                basis(i, 0) = xodd(i % n);
-            }
-            basis(i, 1) = y(i / n);
+            float xi = x(i / n);
+            float yi = y(i % n);
+            printf("xi: %f, yi: %f\n", xi, yi);
+            positions(i, 0) = xi;
+            positions(i, 1) = yi;
         }
     }
 
+    void hexagonal_tuning() {
+
+        square_tuning();
+        return void();
+
+        int n = static_cast<int>(std::sqrt(N));
+        if (n * n != N) {
+            LOG("WARNING: downsizing to " + std::to_string(n * n));
+            this->N = n * n;
+        }
+
+        float s = 1.0f / static_cast<float>(n); // Side length of hexagon
+        float dx = std::sqrt(3.0f) / 2.0f * s;  // Horizontal spacing
+        float dy = 1.5f * s;                    // Vertical spacing
+
+        Eigen::MatrixXf positions(N, 2); // Grid positions
+
+        for (int i = 0; i < n; ++i) {      // Iterate over rows
+            for (int j = 0; j < n; ++j) {  // Iterate over columns
+                int idx = i * n + j;
+                positions(idx, 0) = j * dx;
+                positions(idx, 1) = i * dy + (j % 2) * (s / 2);
+            }
+        }
+
+        // Normalize positions to fit within [0, 1] range
+        positions.col(0).array() /= (n * dx);
+        positions.col(1).array() /= (n * dy);
+
+        utils::logging.log_matrix(positions);
+        this->positions = positions;
+    }
+
+    void circle_tuning() {
+        utils::logging.log("not implemented yet");
+    }
+
+    void boundary_conditions() {
+        for (int i = 0; i < N; i++) {
+            std::array<float, 2> new_position = apply_boundary(
+                            positions(i, 0),
+                            positions(i, 1));
+            positions(i, 0) = new_position[0];
+            positions(i, 1) = new_position[1];
+        }
+    }
+
+    // gaussian distance of each position to the centers
+    void calc_activation() {
+        float dist_squared;
+        for (int i = 0; i < N; i++) {
+
+            /* dist_squared = std::pow( */
+            /*     positions(i, 0) - 0.5f, 2) + \ */
+            /*     std::pow(positions(i, 1) - 0.5f, 2); */
+            dist_squared = std::pow(positions(i, 0), 2) + \
+                std::pow(positions(i, 1), 2);
+
+            y(i) = std::exp(-dist_squared / sigma);
+        }
+    }
+
+    /* // apply boundary conditions */
+    std::array<float, 2> apply_boundary(float x, float y) {
+
+        switch (kind_num) {
+            case BoundaryType::square:
+                if (x < -1.0) { x += 2.0; }
+                else if (x > 1.0) { x -= 2.0; }
+                if (y < -1.0) { y += 2.0; }
+                else if (y > 1.0) { y -= 2.0; }
+                break;
+            case BoundaryType::klein:
+                if (x < -1.0) { x += 2.0; y = 2.0 - y; }
+                else if (x > 1.0) { x -= 2.0; y = 2.0 - y; }
+                if (y < -1.0) { y += 2.0; x = 2.0 - x;}
+                else if (y > 1.0) { y -= 2.0; x = 2.0 - x;}
+                break;
+            case BoundaryType::circle:
+                utils::logging.log("not implemented yet");
+                break;
+            case BoundaryType::hexagon:
+                std::array<float, 2> P = hexagon.call(x, y);
+                x = P[0];
+                y = P[1];
+
+        /* positions(i, 0) = x; */
+        /* positions(i, 1) = y; */
+        }
+
+        return {x, y};
+    };
+
+};
+
+
+class GridNetwork {
+
+public:
+
+    GridNetwork(std::vector<GridLayer> layers)
+        : layers(layers) {
+
+        // Initialize the variables
+        num_layers = layers.size();
+        int total_size = 0;
+        for (auto& layer : layers) {
+                total_size += layer.len();
+            }
+        this->N = total_size;
+        y = Eigen::VectorXf::Zero(N);
+        LOG("[+] GridNetwork created");
+    }
+
+    ~GridNetwork() { LOG("[-] GridNetwork destroyed"); }
+
+
+    Eigen::VectorXf call(const std::array<float, 2>& x) {
+
+        int offset = 0;
+        for (auto& layer : layers) {
+            Eigen::VectorXf layer_output = layer.call(x);
+            int layer_size = layer_output.size();
+
+            // Place the layer's output in the corresponding segment
+            for (int i = 0; i < layer_size; i++) {
+                y(offset + i) = layer_output(i);
+            }
+            /* y.segment(offset, layer_size) = layer_output; */
+            offset += layer_size;
+        }
+        return y;
+    }
+
+    int len() const { return N; }
+    std::string str() const { return "GridStack"; }
+    std::string repr() const { return str() + "(N=" + \
+        std::to_string(N) + ")"; }
+    Eigen::VectorXf get_activation() const { return y; }
+
+private:
+    std::vector<GridLayer> layers;
+    int N;
+    int num_layers;
+    Eigen::VectorXf y;
 };
 
 
@@ -898,7 +1273,7 @@ public:
         return "LeakyVariable." + name + "(eq=" + \
             std::to_string(eq) + ", tau=" + std::to_string(tau) + ")";
     }
-    int len() { return 1; }
+    int len() const { return 1; }
     std::string get_name() { return name; }
     void set_eq(float eq) { this->eq = eq; }
     void reset() { v = eq; }
@@ -1002,7 +1377,7 @@ public:
     bool is_done() { return counter == num_samples; }
     std::string str() { return "ActionSampling2D." + name; }
     std::string repr() { return "ActionSampling2D." + name; }
-    int len() { return num_samples; }
+    int len() const { return num_samples; }
     const int get_idx() { return idx; }
     const int get_counter() { return counter; }
 
@@ -1314,9 +1689,12 @@ void test_randlayer() {
 
 void test_gridlayer() {
 
-    GridLayer gc(16, 0.1, 0.2);
+    GridLayer gc(9, 0.1, 0.2);
     /* printf(gc.str()); */
 
-    utils::logging.log_matrix(gc.get_centers());
+    utils::logging.log_matrix(gc.get_positions());
+
+    std::array<float, 2> x = {0.2, 0.2};
+    gc.call(x);
 }
 };

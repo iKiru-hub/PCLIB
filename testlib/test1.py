@@ -148,6 +148,27 @@ def test_pclayer():
         f" correct {len(y)}"
 
 
+def test_gridlayer():
+
+    n = 3
+    sigma = 0.1
+    speed = 0.1
+
+    # defintion
+    layer = pclib.GridLayer(n**2, sigma, speed)
+
+    # check dimensions
+    assert n**2 == len(layer), f"Dimension of the layer" + \
+        f"correct {len(layer)}"
+    assert layer.get_centers().shape == (n**2, 2), \
+        f"Dimension of the layer is not correct " + \
+        f"{layer.get_centers().shape} expected {(n**2, 2)}"
+
+    # check call
+    v = np.array([0.5, 0.5])
+    layer(v)
+
+
 def test_pcnn_basics():
 
     """
@@ -261,6 +282,16 @@ def test_one_layer_network():
         f"{len(h)}"
     assert len(wh) == 5, f"Hidden layer weights are not " \
         f"correct {len(wh)}"
+
+
+def test_hexagon():
+
+    """
+    test the hexagonal lattice
+    """
+
+    hex = pclib.Hexagon()
+
 
 
 if __name__ == "__main__":

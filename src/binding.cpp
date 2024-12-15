@@ -14,6 +14,22 @@ PYBIND11_MODULE(pclib, m) {
 
     /* PCNN MODEL */
 
+    // (InputFilter) Grid Layer
+    py::class_<GridLayer>(m, "GridLayer")
+        .def(py::init<int, float, float, std::string>(),
+             py::arg("N"),
+             py::arg("sigma"),
+             py::arg("speed"),
+             py::arg("kind") = "square")
+        .def("__call__", &GridLayer::call,
+             py::arg("v"))
+        .def("__str__", &GridLayer::str)
+        .def("__len__", &GridLayer::len)
+        .def("__repr__", &GridLayer::repr)
+        .def("get_centers", &GridLayer::get_centers)
+        .def("get_activation", &GridLayer::get_activation)
+        .def("get_positions", &GridLayer::get_positions);
+
     // (InputFilter) Random Layer
     py::class_<RandLayer>(m, "RandLayer")
         .def(py::init<int>(),
@@ -23,7 +39,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("__str__", &RandLayer::str)
         .def("__len__", &RandLayer::len)
         .def("__repr__", &RandLayer::repr)
-        .def("get_centers", &RandLayer::get_centers);
+        .def("get_centers", &RandLayer::get_centers)
+        .def("get_activation", &RandLayer::get_activation);
 
     // PCNN network model [Rand]
     py::class_<PCNNrand>(m, "PCNNrand")
@@ -76,7 +93,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("__str__", &PCLayer::str)
         .def("__len__", &PCLayer::len)
         .def("__repr__", &PCLayer::repr)
-        .def("get_centers", &PCLayer::get_centers);
+        .def("get_centers", &PCLayer::get_centers)
+        .def("get_activation", &RandLayer::get_activation);
 
     // PCNN network model
     py::class_<PCNN>(m, "PCNN")
@@ -116,6 +134,17 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("x"))
         .def("fwd_int", &PCNN::fwd_int,
              py::arg("a"));
+
+    // Grid Layer Network
+    py::class_<GridNetwork>(m, "GridNetwork")
+        .def(py::init<std::vector<GridLayer>>(),
+             py::arg("layers"))
+        .def("__call__", &GridNetwork::call,
+                py::arg("x"))
+        .def("__str__", &GridNetwork::str)
+        .def("__len__", &GridNetwork::len)
+        .def("__repr__", &GridNetwork::repr)
+        .def("get_activation", &GridNetwork::get_activation);
 
 
     /* MODULATION MODULES */
@@ -210,5 +239,15 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("x"))
         .def("__str__", &OneLayerNetwork::str)
         .def("get_weights", &OneLayerNetwork::get_weights);
+
+    // Hexagon
+    py::class_<Hexagon>(m, "Hexagon")
+        .def(py::init<>())
+        .def("__call__", &Hexagon::call,
+             py::arg("x"),
+             py::arg("y"))
+        .def("__str__", &Hexagon::str)
+        .def("get_centers", &Hexagon::get_centers);
+
 }
 
