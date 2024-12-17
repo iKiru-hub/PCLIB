@@ -66,6 +66,20 @@ PROCEDURE:
    new point P
 */
 
+/*
+m = {
+    {(-0.5+0.5)/2, (-0.86602540378-0.86602540378)/2},
+    {(1+0.5)/2, (-0.86602540378+0)/2},
+    {(1+0.5)/2, (0+0.86602540378)/2},
+    {(0.5-0.5)/2, (0.86602540378+0.86602540378)/2},
+    {(-0.5-1)/2, (0.86602540378+0)/2},
+    {(-1-0.5)/2, (0-0.86602540378)/2}
+}
+for i=1,#m,1
+do
+    print(m[i][1].."; "..m[i][2])
+end
+*/
 
 class Hexagon {
 
@@ -116,6 +130,8 @@ class Hexagon {
         float ay = centers[index[0]][1];
         float bx = centers[index[1]][0];
         float by = centers[index[1]][1];
+        float mx = (ax + bx) / 2.0f;
+        float my = (ay + by) / 2.0f;
 
         //
         /* printf("A: %f, %f\n", ax, ay); */
@@ -142,10 +158,10 @@ class Hexagon {
         std::array<float, 2> z;
         if (sy > 0) {
              z = utils::reflect_point_over_segment(
-                rx, ry, 0.0f, 0.0f, sx, sy);
+                rx, ry, 0.0f, 0.0f, mx, my);
         } else {
             z = utils::reflect_point_over_segment(
-                rx, ry, sx, sy, 0.0f, 0.0f);
+                rx, ry, mx, my, 0.0f, 0.0f);
         }
 
         *p_new_x = z[0];

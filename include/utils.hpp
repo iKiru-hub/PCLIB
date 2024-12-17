@@ -698,8 +698,8 @@ std::array<float, 2> reflect_point_over_segment(
         return {x, 2*y1 - y};
     }
 
-    printf("\nx1: %f, y1: %f, x2: %f, y2: %f\n", x1, y1, x2, y2);
-    printf("x: %f, y: %f\n", x, y);
+    /* printf("\nx1: %f, y1: %f, x2: %f, y2: %f\n", x1, y1, x2, y2); */
+    /* printf("x: %f, y: %f\n", x, y); */
 
     // define line equation
     float m = (y2-y1) / (x2 - x1);
@@ -712,7 +712,7 @@ std::array<float, 2> reflect_point_over_segment(
     float y3 = y2 - y1;
     float _x3 = -y3 + x1;
     float _y3 = x3 + y1;
-    printf("_x3: %f, _y3: %f\n", _x3, _y3);
+    /* printf("_x3: %f, _y3: %f\n", _x3, _y3); */
 
     float _m = (_y3 - y1) / (_x3 - x1);
 
@@ -730,11 +730,11 @@ std::array<float, 2> reflect_point_over_segment(
     // reflect x,y over xc,yc
     float xr = 2*xc - x;
     float yr = 2*yc - y;
-    printf("x: %f, y: %f\n", x, y);
-    printf("m, _m: %f, %f\n", m, _m);
-    printf("q, _q: %f, %f\n", q, _q);
-    printf("xc: %f, yc: %f\n", xc, yc);
-    printf("xr: %f, yr: %f\n", xr, yr);
+    /* printf("x: %f, y: %f\n", x, y); */
+    /* printf("m, _m: %f, %f\n", m, _m); */
+    /* printf("q, _q: %f, %f\n", q, _q); */
+    /* printf("xc: %f, yc: %f\n", xc, yc); */
+    /* printf("xr: %f, yr: %f\n", xr, yr); */
 
     return {xr, yr};
 }
