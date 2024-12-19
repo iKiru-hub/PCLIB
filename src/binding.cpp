@@ -16,16 +16,18 @@ PYBIND11_MODULE(pclib, m) {
 
     // (InputFilter) Grid Layer
     py::class_<GridLayer>(m, "GridLayer")
-        .def(py::init<int, float, float, std::string>(),
+        .def(py::init<int, float, float, std::string,
+             std::string>(),
              py::arg("N"),
              py::arg("sigma"),
              py::arg("speed"),
-             py::arg("kind") = "square")
+             py::arg("boundary_type") = "square",
+             py::arg("positions_type") = "square")
         .def("__call__", &GridLayer::call,
              py::arg("v"))
         .def("__str__", &GridLayer::str)
-        .def("__len__", &GridLayer::len)
         .def("__repr__", &GridLayer::repr)
+        .def("__len__", &GridLayer::len)
         .def("get_centers", &GridLayer::get_centers)
         .def("get_activation", &GridLayer::get_activation)
         .def("get_positions", &GridLayer::get_positions);
@@ -142,8 +144,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("__call__", &GridNetwork::call,
                 py::arg("x"))
         .def("__str__", &GridNetwork::str)
-        .def("__len__", &GridNetwork::len)
         .def("__repr__", &GridNetwork::repr)
+        .def("__len__", &GridNetwork::len)
         .def("get_activation", &GridNetwork::get_activation);
 
 

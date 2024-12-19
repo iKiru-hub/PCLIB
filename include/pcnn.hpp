@@ -374,43 +374,59 @@ private:
 
 enum BoundaryType {
     square,
-    klein,
+    hexagon,
     circle,
-    hexagon
+    klein
 };
-
 
 class GridLayer : public InputLayer {
 
 public:
 
     GridLayer(int N, float sigma, float speed,
-              std::string kind = "square"):
-        InputLayer(N), sigma(sigma), speed(speed){
+              std::string boundary_type = "square",
+              std::string positions_type = "square"):
+        InputLayer(N), sigma(sigma), speed(speed),
+        boundary_type(boundary_type),
+        positions_type(positions_type){
 
         this->positions = Eigen::MatrixXf::Zero(N, 2);
 
-        if (kind == "square") {
-            kind_num = BoundaryType::square;
-        } else if (kind == "klein") {
-            kind_num = BoundaryType::klein;
-        } else if (kind == "circle") {
-            kind_num = BoundaryType::circle;
-        } else if (kind == "hexagon") {
-            kind_num = BoundaryType::hexagon;
-            /* pHexagon = new Hexagon(); */
-            hexagon = Hexagon();
+        // record positions
+        if (positions_type == "square") {
+            square_positions();
+        } else if (positions_type == "random_square") {
+            random_square_positions();
+        } else if (positions_type == "shifted_square") {
+            shifted_square_positions();
+        } else if (positions_type == "random_circle") {
+            random_circle_positions();
         } else {
-            LOG("WARNING: unknown boundary type");
+            throw std::invalid_argument(
+                "CUSTOM ERROR: unknown position type" );
         }
 
-        utils::logging.log("kind: " + \
-                           std::to_string(kind_num));
-        make_tuning();
+        // record boundary type
+        if (boundary_type == "square") {
+            boundary_type_num = BoundaryType::square;
+        } else if (boundary_type == "hexagon") {
+            boundary_type_num = BoundaryType::hexagon;
+        } else if (boundary_type == "circle") {
+            boundary_type_num = BoundaryType::circle;
+        } else if (boundary_type == "klein") {
+            boundary_type_num = BoundaryType::klein;
+        } else {
+            throw std::invalid_argument(
+                "CUSTOM ERROR: unknown boundary type" );
+        }
+
+        LOG("Boundary type: " + boundary_type);
+        LOG("Positions type: " + positions_type);
 
         // make matrix
         LOG("[+] GridLayer created");
     }
+
     ~GridLayer() { LOG("[-] GridLayer destroyed"); }
 
     // @brief call the GridLayer with a 2D input
@@ -430,37 +446,57 @@ public:
         return y;
     }
 
-    std::string str() { return "GridLayer"; }
+    // @brief calibration of the positions
+    // @param dx, dy: distance for x, y
+    void calibration(const float dx, float dy) {
+
+        switch (boundary_type_num) {
+
+            case BoundaryType::square:
+
+                // take the integer part of the dx, dy
+                dx = std::floor(dx);
+                dy = std::floor(dy);
+
+                for (int i = 0; i < N; i++) {
+                    positions(i, 0) += dx;
+                    positions(i, 1) += dy;
+                }
+                break;
+
+            // assuming only the apothme
+            case BoundaryType::hexagon:
+
+                // take the integer part of the dx, dy
+                dx = std::floor(dx);
+                dy = std::floor(dy);
+
+                for (int i = 0; i < N; i++) {
+                    positions(i, 0) += dx;
+                    positions(i, 1) += dy;
+                }
+                break;
+            }
+
+    }
+
+    std::string str() const { return "GridLayer"; }
+    std::string repr() const { return "GridLayer" + \
+        boundary_type + ", " + positions_type + ")"; }
     Eigen::MatrixXf get_positions() { return positions; }
 
 private:
     Eigen::MatrixXf positions;
     float sigma;
     float speed;
-    int kind_num;
+    int boundary_type_num;
+    std::string boundary_type;
+    std::string positions_type;
     /* Hexagon* pHexagon; */
     Hexagon hexagon;
 
-    // define the offset of the gc centers
-    void make_tuning() {
-        switch (kind_num) {
-            case BoundaryType::square:
-                square_tuning();
-                break;
-            case BoundaryType::klein:
-                square_tuning();
-                break;
-            case BoundaryType::circle:
-                circle_tuning();
-                break;
-            case BoundaryType::hexagon:
-                square_tuning();
-                /* hexagonal_tuning(); */
-                break;
-        }
-    }
-
-    void square_tuning() {
+    //
+    void square_positions() {
 
         int n = static_cast<int>(std::sqrt(N));
         if (n*n != N) {
@@ -489,25 +525,40 @@ private:
         }
     }
 
-    void hexagonal_tuning() {
+    void random_square_positions() {
 
-        square_tuning();
-        return void();
+        // sample random points within the unit circle
+        for (int i = 0; i < N; i++) {
+            float x = utils::random.get_random_float(0, 1);
+            float y = utils::random.get_random_float(0, 1);
+            positions(i, 0) = x;
+            positions(i, 1) = y;
+        }
+
+    }
+
+    void shifted_square_positions() {
 
         int n = static_cast<int>(std::sqrt(N));
         if (n * n != N) {
-            LOG("WARNING: downsizing to " + std::to_string(n * n));
+            LOG("WARNING: downsizing to " + \
+                std::to_string(n * n));
             this->N = n * n;
         }
+        // Side length of hexagon
+        float s = 1.0f / static_cast<float>(n);
+        // Horizontal spacing
+        float dx = std::sqrt(3.0f) / 2.0f * s;
 
-        float s = 1.0f / static_cast<float>(n); // Side length of hexagon
-        float dx = std::sqrt(3.0f) / 2.0f * s;  // Horizontal spacing
-        float dy = 1.5f * s;                    // Vertical spacing
+        // Vertical spacing
+        float dy = 1.5f * s;
 
-        Eigen::MatrixXf positions(N, 2); // Grid positions
+        // Grid positions
+        Eigen::MatrixXf positions(N, 2);
 
-        for (int i = 0; i < n; ++i) {      // Iterate over rows
-            for (int j = 0; j < n; ++j) {  // Iterate over columns
+        // Iterate over rows
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
                 int idx = i * n + j;
                 positions(idx, 0) = j * dx;
                 positions(idx, 1) = i * dy + (j % 2) * (s / 2);
@@ -522,8 +573,16 @@ private:
         this->positions = positions;
     }
 
-    void circle_tuning() {
-        utils::logging.log("not implemented yet");
+    void random_circle_positions() {
+
+        // sample random points within the unit circle
+        for (int i = 0; i < N; i++) {
+            float theta = utils::random.get_random_float(
+                                        0.0f, 6.28f);
+            float radius = utils::random.get_random_float(0, 1);
+            positions(i, 0) = radius * std::cos(theta);
+            positions(i, 1) = radius * std::sin(theta);
+        }
     }
 
     void boundary_conditions() {
@@ -554,7 +613,7 @@ private:
     /* // apply boundary conditions */
     std::array<float, 2> apply_boundary(float x, float y) {
 
-        switch (kind_num) {
+        switch (boundary_type_num) {
             case BoundaryType::square:
                 if (x < -1.0) { x += 2.0; }
                 else if (x > 1.0) { x -= 2.0; }
@@ -595,16 +654,18 @@ public:
         // Initialize the variables
         num_layers = layers.size();
         int total_size = 0;
+        full_repr = "(";
         for (auto& layer : layers) {
                 total_size += layer.len();
+                full_repr += layer.repr() + ",";
             }
+        full_repr += ")";
         this->N = total_size;
         y = Eigen::VectorXf::Zero(N);
         LOG("[+] GridNetwork created");
     }
 
     ~GridNetwork() { LOG("[-] GridNetwork destroyed"); }
-
 
     Eigen::VectorXf call(const std::array<float, 2>& x) {
 
@@ -625,7 +686,8 @@ public:
 
     int len() const { return N; }
     std::string str() const { return "GridStack"; }
-    std::string repr() const { return str() + "(N=" + \
+    std::string repr() const {
+        return str() + "(" + full_repr + " N=" + \
         std::to_string(N) + ")"; }
     Eigen::VectorXf get_activation() const { return y; }
 
@@ -633,6 +695,7 @@ private:
     std::vector<GridLayer> layers;
     int N;
     int num_layers;
+    std::string full_repr;
     Eigen::VectorXf y;
 };
 

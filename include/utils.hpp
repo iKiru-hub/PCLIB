@@ -224,7 +224,7 @@ inline Eigen::VectorXf generalized_sigmoid_vec(
 }
 
 // @brief like above with float
-float generalized_sigmoid(const float& x,
+float generalized_sigmoid(const float x,
     float offset = 1.0f,
     float gain = 1.0f,
     float clip = 0.0f) {
