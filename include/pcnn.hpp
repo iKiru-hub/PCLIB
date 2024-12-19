@@ -448,7 +448,7 @@ public:
 
     // @brief calibration of the positions
     // @param dx, dy: distance for x, y
-    void calibration(const float dx, float dy) {
+    void calibration(float dx, float dy) {
 
         switch (boundary_type_num) {
 
@@ -466,6 +466,8 @@ public:
 
             // assuming only the apothme
             case BoundaryType::hexagon:
+
+                printf("WARNING: for haxagon the calibration is wrong");
 
                 // take the integer part of the dx, dy
                 dx = std::floor(dx);
