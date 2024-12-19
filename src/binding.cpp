@@ -32,6 +32,58 @@ PYBIND11_MODULE(pclib, m) {
         .def("get_activation", &GridLayer::get_activation)
         .def("get_positions", &GridLayer::get_positions);
 
+    // Grid Layer Network
+    py::class_<GridNetwork>(m, "GridNetwork")
+        .def(py::init<std::vector<GridLayer>>(),
+             py::arg("layers"))
+        .def("__call__", &GridNetwork::call,
+                py::arg("x"))
+        .def("__str__", &GridNetwork::str)
+        .def("__repr__", &GridNetwork::repr)
+        .def("__len__", &GridNetwork::len)
+        .def("get_activation", &GridNetwork::get_activation)
+        .def("get_centers", &GridNetwork::get_centers);
+
+
+    // PCNN network model [Grid]
+    py::class_<PCNNgrid>(m, "PCNNgrid")
+        .def(py::init<int, int, float, float,
+             float, float, float, float, \
+             int, float, GridNetwork, std::string>(),
+             py::arg("N"),
+             py::arg("Nj"),
+             py::arg("gain"),
+             py::arg("offset"),
+             py::arg("clip_min"),
+             py::arg("threshold"),
+             py::arg("rep_threshold"),
+             py::arg("rec_threshold"),
+             py::arg("num_neighbors"),
+             py::arg("trace_tau"),
+             py::arg("xfilter"),
+             py::arg("name"))
+        .def("__call__", &PCNNgrid::call,
+             py::arg("x"),
+             py::arg("frozen") = false,
+             py::arg("traced") = true)
+        .def("__str__", &PCNNgrid::str)
+        .def("__len__", &PCNNgrid::len)
+        .def("__repr__", &PCNNgrid::repr)
+        .def("update", &PCNNgrid::update)
+        .def("ach_modulation", &PCNNgrid::ach_modulation,
+             py::arg("ach"))
+        .def("get_size", &PCNNgrid::get_size)
+        .def("get_trace", &PCNNgrid::get_trace)
+        .def("get_wff", &PCNNgrid::get_wff)
+        .def("get_wrec", &PCNNgrid::get_wrec)
+        .def("get_connectivity", &PCNNgrid::get_connectivity)
+        .def("get_delta_update", &PCNNgrid::get_delta_update)
+        .def("get_centers", &PCNNgrid::get_centers)
+        .def("fwd_ext", &PCNNgrid::fwd_ext,
+             py::arg("x"))
+        .def("fwd_int", &PCNNgrid::fwd_int,
+             py::arg("a"));
+
     // (InputFilter) Random Layer
     py::class_<RandLayer>(m, "RandLayer")
         .def(py::init<int>(),
@@ -136,17 +188,6 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("x"))
         .def("fwd_int", &PCNN::fwd_int,
              py::arg("a"));
-
-    // Grid Layer Network
-    py::class_<GridNetwork>(m, "GridNetwork")
-        .def(py::init<std::vector<GridLayer>>(),
-             py::arg("layers"))
-        .def("__call__", &GridNetwork::call,
-                py::arg("x"))
-        .def("__str__", &GridNetwork::str)
-        .def("__repr__", &GridNetwork::repr)
-        .def("__len__", &GridNetwork::len)
-        .def("get_activation", &GridNetwork::get_activation);
 
 
     /* MODULATION MODULES */
