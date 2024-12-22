@@ -360,7 +360,6 @@ Eigen::VectorXf gaussian_distance_exp(
     return (-distance.array()).exp();
 }
 
-
 // @brief: calculate the maximum cosine similarity in a rows
 float max_cosine_similarity_in_rows(
     const Eigen::MatrixXf& matrix, int idx) {
@@ -405,6 +404,7 @@ Eigen::VectorXf linspace(float start, float end, int num)
 
     return linspaced;
 }
+
 
 /* ========================================== */
 /* ============ MATRIX FUNCTIONS ============ */

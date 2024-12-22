@@ -153,9 +153,10 @@ def test_gridlayer():
     n = 3
     sigma = 0.1
     speed = 0.1
+    init_bounds = [-1, 1, -1, 1]
 
     # defintion
-    layer = pclib.GridLayer(n**2, sigma, speed)
+    layer = pclib.GridLayer(n**2, sigma, speed, init_bounds)
 
     # check dimensions
     assert n**2 == len(layer), f"Dimension of the layer" + \

@@ -16,13 +16,16 @@ PYBIND11_MODULE(pclib, m) {
 
     // (InputFilter) Grid Layer
     py::class_<GridLayer>(m, "GridLayer")
-        .def(py::init<int, float, float, std::string,
+        .def(py::init<int, float, float,
+             std::array<float, 4>,
+             std::string,
              std::string>(),
              py::arg("N"),
              py::arg("sigma"),
              py::arg("speed"),
+             py::arg("init_bounds"),
              py::arg("boundary_type") = "square",
-             py::arg("positions_type") = "square")
+             py::arg("basis_type") = "square")
         .def("__call__", &GridLayer::call,
              py::arg("v"))
         .def("__str__", &GridLayer::str)
@@ -42,7 +45,9 @@ PYBIND11_MODULE(pclib, m) {
         .def("__repr__", &GridNetwork::repr)
         .def("__len__", &GridNetwork::len)
         .def("get_activation", &GridNetwork::get_activation)
-        .def("get_centers", &GridNetwork::get_centers);
+        .def("get_centers", &GridNetwork::get_centers)
+        .def("get_num_layers", &GridNetwork::get_num_layers)
+        .def("get_positions", &GridNetwork::get_positions);
 
 
     // PCNN network model [Grid]
@@ -63,13 +68,15 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("xfilter"),
              py::arg("name"))
         .def("__call__", &PCNNgrid::call,
-             py::arg("x"),
+             py::arg("v"),
              py::arg("frozen") = false,
              py::arg("traced") = true)
         .def("__str__", &PCNNgrid::str)
         .def("__len__", &PCNNgrid::len)
         .def("__repr__", &PCNNgrid::repr)
-        .def("update", &PCNNgrid::update)
+        .def("update", &PCNNgrid::update,
+             py::arg("x") = -1.0,
+             py::arg("y") = -1.0)
         .def("ach_modulation", &PCNNgrid::ach_modulation,
              py::arg("ach"))
         .def("get_size", &PCNNgrid::get_size)
@@ -77,8 +84,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("get_wff", &PCNNgrid::get_wff)
         .def("get_wrec", &PCNNgrid::get_wrec)
         .def("get_connectivity", &PCNNgrid::get_connectivity)
-        .def("get_delta_update", &PCNNgrid::get_delta_update)
         .def("get_centers", &PCNNgrid::get_centers)
+        .def("get_delta_update", &PCNNgrid::get_delta_update)
         .def("fwd_ext", &PCNNgrid::fwd_ext,
              py::arg("x"))
         .def("fwd_int", &PCNNgrid::fwd_int,

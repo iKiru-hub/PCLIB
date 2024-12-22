@@ -384,31 +384,34 @@ class GridLayer : public InputLayer {
 public:
 
     GridLayer(int N, float sigma, float speed,
+              std::array<float, 4> init_bounds = {-1, 1, -1, 1},
               std::string boundary_type = "square",
-              std::string positions_type = "square"):
+              std::string basis_type = "square"):
         InputLayer(N), sigma(sigma), speed(speed),
         boundary_type(boundary_type),
-        positions_type(positions_type){
+        basis_type(basis_type),
+        init_bounds(init_bounds){
 
+        this->basis = Eigen::MatrixXf::Zero(N, 2);
         this->positions = Eigen::MatrixXf::Zero(N, 2);
 
         // record positions
-        if (positions_type == "square") {
-            square_positions();
-        } else if (positions_type == "random_square") {
-            random_square_positions();
-        } else if (positions_type == "shifted_square") {
-            shifted_square_positions();
-        } else if (positions_type == "random_circle") {
-            random_circle_positions();
+        if (basis_type == "square") {
+            square_basis();
+        } else if (basis_type == "random_square") {
+            random_square_basis();
+        } else if (basis_type == "shifted_square") {
+            shifted_square_basis();
+        } else if (basis_type == "random_circle") {
+            random_circle_basis();
         } else {
             throw std::invalid_argument(
-                "CUSTOM ERROR: unknown position type" );
+                "CUSTOM ERROR: unknown basis type" );
         }
 
         // record initial positions in the basis
         // pass by value
-        basis = positions;
+        positions = basis;
 
         // record boundary type
         if (boundary_type == "square") {
@@ -424,8 +427,8 @@ public:
                 "CUSTOM ERROR: unknown boundary type" );
         }
 
-        LOG("Boundary type: " + boundary_type);
-        LOG("Positions type: " + positions_type);
+        DEBUG("Boundary type: " + boundary_type);
+        DEBUG("Basis type: " + basis_type);
 
         // make matrix
         LOG("[+] GridLayer created");
@@ -450,45 +453,9 @@ public:
         return y;
     }
 
-    // @brief calibration of the positions
-    // @param dx, dy: distance for x, y
-    void calibration(float dx, float dy) {
-
-        switch (boundary_type_num) {
-
-            case BoundaryType::square:
-
-                // take the integer part of the dx, dy
-                dx = std::floor(dx);
-                dy = std::floor(dy);
-
-                for (int i = 0; i < N; i++) {
-                    positions(i, 0) += dx;
-                    positions(i, 1) += dy;
-                }
-                break;
-
-            // assuming only the apothme
-            case BoundaryType::hexagon:
-
-                printf("WARNING: for haxagon the calibration is wrong");
-
-                // take the integer part of the dx, dy
-                dx = std::floor(dx);
-                dy = std::floor(dy);
-
-                for (int i = 0; i < N; i++) {
-                    positions(i, 0) += dx;
-                    positions(i, 1) += dy;
-                }
-                break;
-            }
-
-    }
-
     std::string str() const { return "GridLayer"; }
     std::string repr() const { return "GridLayer(" + \
-        boundary_type + ", " + positions_type + ")"; }
+        boundary_type + ", " + basis_type + ")"; }
     Eigen::MatrixXf get_positions() { return positions; }
 
 private:
@@ -497,12 +464,12 @@ private:
     float speed;
     int boundary_type_num;
     std::string boundary_type;
-    std::string positions_type;
-    /* Hexagon* pHexagon; */
+    std::string basis_type;
     Hexagon hexagon;
+    std::array<float, 4> init_bounds;
 
     //
-    void square_positions() {
+    void square_basis() {
 
         int n = static_cast<int>(std::sqrt(N));
         if (n*n != N) {
@@ -514,36 +481,37 @@ private:
         float dx = 1.0f / (static_cast<float>(n) + 0.0f);
 
         // define the centers as a grid excluding
+        /* Eigen::VectorXf y = utils::linspace( */
+        /*                 0.0f, 1.0f-dx, n); */
+        /* Eigen::VectorXf x = utils::linspace( */
+        /*                 0.0f, 1.0f-dx, n); */
         Eigen::VectorXf y = utils::linspace(
-                        0.0f, 1.0f-dx, n);
+                        init_bounds[0],
+                        init_bounds[1]-dx, n);
         Eigen::VectorXf x = utils::linspace(
-                        0.0f, 1.0f-dx, n);
-
-        utils::logging.log_vector(x);
-        utils::logging.log_vector(y);
+                        init_bounds[2],
+                        init_bounds[3]-dx, n);
 
         for (std::size_t i=0; i<N; i++) {
             float xi = x(i / n);
             float yi = y(i % n);
-            printf("xi: %f, yi: %f\n", xi, yi);
-            positions(i, 0) = xi;
-            positions(i, 1) = yi;
+            basis(i, 0) = xi;
+            basis(i, 1) = yi;
         }
     }
 
-    void random_square_positions() {
+    void random_square_basis() {
 
         // sample random points within the unit circle
         for (int i = 0; i < N; i++) {
             float x = utils::random.get_random_float(0, 1);
             float y = utils::random.get_random_float(0, 1);
-            positions(i, 0) = x;
-            positions(i, 1) = y;
+            basis(i, 0) = x;
+            basis(i, 1) = y;
         }
-
     }
 
-    void shifted_square_positions() {
+    void shifted_square_basis() {
 
         int n = static_cast<int>(std::sqrt(N));
         if (n * n != N) {
@@ -560,34 +528,33 @@ private:
         float dy = 1.5f * s;
 
         // Grid positions
-        Eigen::MatrixXf positions(N, 2);
+        Eigen::MatrixXf basis(N, 2);
 
         // Iterate over rows
         for (int i = 0; i < n; ++i) {
             for (int j = 0; j < n; ++j) {
                 int idx = i * n + j;
-                positions(idx, 0) = j * dx;
-                positions(idx, 1) = i * dy + (j % 2) * (s / 2);
+                basis(idx, 0) = j * dx;
+                basis(idx, 1) = i * dy + (j % 2) * (s / 2);
             }
         }
 
         // Normalize positions to fit within [0, 1] range
-        positions.col(0).array() /= (n * dx);
-        positions.col(1).array() /= (n * dy);
+        basis.col(0).array() /= (n * dx);
+        basis.col(1).array() /= (n * dy);
 
-        utils::logging.log_matrix(positions);
-        this->positions = positions;
+        this->basis = basis;
     }
 
-    void random_circle_positions() {
+    void random_circle_basis() {
 
         // sample random points within the unit circle
         for (int i = 0; i < N; i++) {
             float theta = utils::random.get_random_float(
                                         0.0f, 6.28f);
             float radius = utils::random.get_random_float(0, 1);
-            positions(i, 0) = radius * std::cos(theta);
-            positions(i, 1) = radius * std::sin(theta);
+            basis(i, 0) = radius * std::cos(theta);
+            basis(i, 1) = radius * std::sin(theta);
         }
     }
 
@@ -616,7 +583,7 @@ private:
         }
     }
 
-    /* // apply boundary conditions */
+    // apply boundary conditions
     std::array<float, 2> apply_boundary(float x, float y) {
 
         switch (boundary_type_num) {
@@ -658,7 +625,7 @@ public:
         : layers(layers) {
 
         // Initialize the variables
-        num_layers = layers.size();
+        this->num_layers = layers.size();
 
         int total_size = 0;
         full_repr = "(";
@@ -678,28 +645,16 @@ public:
 
     Eigen::VectorXf call(const std::array<float, 2>& x) {
 
-        /* int offset = 0; */
-        /* for (auto& layer : layers) { */
         for (int i = 0; i < num_layers; i++) {
             y.segment(i*layers[i].len(), layers[i].len()) = \
                 layers[i].call(x);
-
-            /* y.segment(offset, layer_output.size()) = layer_output; */
-
-            /* int layer_size = layer_output.size(); */
-
-            /* // Place the layer's output in the corresponding segment */
-            /* for (int i = 0; i < layer_size; i++) { */
-            /*     y(offset + i) = layer_output(i); */
-            /* } */
-            /* /1* y.segment(offset, layer_size) = layer_output; *1/ */
-            /* offset += layer_size; */
         }
 
         return y;
     }
 
     int len() const { return N; }
+    int get_num_layers() const { return num_layers; }
     std::string str() const { return "GridNetwork"; }
     std::string repr() const {
         return str() + "(" + full_repr + ", N=" + \
@@ -707,7 +662,17 @@ public:
     Eigen::VectorXf get_activation() const { return y; }
     Eigen::MatrixXf get_centers() {
         for (int i = 0; i < num_layers; i++) {
-            basis.block(i*layers[i].len(), 0, layers[i].len(), 2) = \
+            basis.block(i*layers[i].len(),
+                        0, layers[i].len(), 2) = \
+                layers[i].get_positions();
+        }
+        return basis;
+    }
+
+    Eigen::MatrixXf get_positions() {
+        for (int i = 0; i < num_layers; i++) {
+            basis.block(i*layers[i].len(),
+                        0, layers[i].len(), 2) = \
                 layers[i].get_positions();
         }
         return basis;
@@ -1277,6 +1242,7 @@ public:
         Wffbackup = Eigen::MatrixXf::Zero(N, Nj);
         Wrec = Eigen::MatrixXf::Zero(N, N);
         connectivity = Eigen::MatrixXf::Zero(N, N);
+        centers = Eigen::MatrixXf::Zero(N, 2);
         mask = Eigen::VectorXf::Zero(N);
         u = Eigen::VectorXf::Zero(N);
         trace = Eigen::VectorXf::Zero(N);
@@ -1296,14 +1262,13 @@ public:
 
     ~PCNNgrid() { LOG("[-] PCNN destroyed"); }
 
-    Eigen::VectorXf call(const std::array<float, 2>& x,
-                         const bool frozen = false,
-                         const bool traced = true) {
+    std::pair<Eigen::VectorXf,
+    Eigen::VectorXf> call(const std::array<float, 2>& v,
+                          const bool frozen = false,
+                          const bool traced = true) {
 
         // pass the input through the filter layer
-        x_filtered = xfilter.call(x);
-
-        printf("x_filtered: %f, %f\n", x[0], x[1]);
+        x_filtered = xfilter.call(v);
 
         // forward it to the network by doing a dot product
         // with the feedforward weights
@@ -1329,11 +1294,12 @@ public:
         /*     update(x_filtered); */
         /* } */
 
-        return u;
+        /* return u; */
+        return std::make_pair(u, x_filtered);
     }
 
     // @brief update the model
-    void update() {
+    void update(float x = -1.0, float y = -1.0) {
 
         make_indexes();
 
@@ -1356,6 +1322,10 @@ public:
 
         // determine weight update
         Eigen::VectorXf dw = x_filtered - Wff.row(idx).transpose();
+
+        // trim the weight update
+        /* delta_wff = (dw.array() > 0.01).select(dw, 0.0f); */
+
         delta_wff = dw.norm();
 
         if (delta_wff > 0.0) {
@@ -1383,13 +1353,16 @@ public:
             // update recurrent connections
             update_recurrent();
 
+            // record new center
+            centers.row(idx) = Eigen::Vector2f(x, y);
         }
 
     }
 
-   Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
-        return call(x, true, false);
-    }
+   void fwd_ext(const std::array<float, 2>& x) {}
+   /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
+   /*      return call(x, true, false); */
+   /*  } */
 
    Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
         return Wrec * a + pre_x;
@@ -1417,13 +1390,14 @@ public:
     Eigen::MatrixXf get_wff() const { return Wff; }
     Eigen::MatrixXf get_wrec() const { return Wrec; }
     Eigen::MatrixXf get_connectivity() const { return connectivity; }
+    Eigen::MatrixXf get_centers() const { return centers; }
     Eigen::VectorXf get_trace() const { return trace; }
     float get_delta_update() const { return delta_wff; }
 
-    Eigen::MatrixXf get_centers() {
-        return utils::calc_centers_from_layer(
-            Wff, xfilter.get_centers());
-    }
+    /* Eigen::MatrixXf get_centers() { */
+    /*     return utils::calc_centers_from_layer( */
+    /*         Wff, xfilter.get_centers()); */
+    /* } */
 
     // @brief modulate the density of new PCs
     void ach_modulation(float ach) {
@@ -1463,6 +1437,7 @@ private:
     Eigen::VectorXf x_filtered;
     Eigen::VectorXf trace;
     Eigen::VectorXf pre_x;
+    Eigen::MatrixXf centers;
 
     // @brief check if one of the fixed neurons
     int check_fixed_indexes() {
