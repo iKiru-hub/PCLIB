@@ -468,7 +468,7 @@ private:
     Hexagon hexagon;
     std::array<float, 4> init_bounds;
 
-    //
+    // define basis type
     void square_basis() {
 
         int n = static_cast<int>(std::sqrt(N));
@@ -558,6 +558,7 @@ private:
         }
     }
 
+    // define boundary type
     void boundary_conditions() {
         for (int i = 0; i < N; i++) {
             std::array<float, 2> new_position = apply_boundary(
@@ -685,6 +686,240 @@ private:
     std::string full_repr;
     Eigen::VectorXf y;
     Eigen::MatrixXf basis;
+};
+
+// === purely hexagonal grid network ===
+
+class GridHexLayer {
+
+public:
+
+    GridHexLayer(float sigma, float speed):
+        sigma(sigma), speed(speed), hexagon(Hexagon()){
+
+        // make matrix
+        LOG("[+] GridHexLayer created");
+    }
+
+    ~GridHexLayer() { LOG("[-] GridHexLayer destroyed"); }
+
+    // @brief call the GridLayer with a 2D input
+    Eigen::VectorXf \
+    call(const std::array<float, 2>& v) {
+
+        // update position with velociy
+        for (int i = 0; i < N; i++) {
+            positions[i][0] = positions[i][0] + speed * v[0];
+            positions[i][1] = positions[i][1] + speed * v[1];
+        }
+
+        // apply boundary conditions
+        boundary_conditions();
+
+        // compute the activation
+        calc_activation();
+        return y;
+    }
+
+    int len() const { return N; }
+    std::string str() const { return "GridHexLayer"; }
+    std::string repr() const { return "GridHexLayer"; }
+    std::array<std::array<float, 2>, 25> get_positions()
+    { return positions; }
+    std::array<std::array<float, 2>, 25> get_centers()
+    { return basis; }
+
+
+private:
+    const int N = 25;
+
+    /* const std::array<std::array<float, 2>, 7> basis = {{ */
+    /*     {-0.5f, std::sin((float)M_PI / 3.0f)}, */
+    /*     {0.5f, std::sin((float)M_PI / 3.0f)}, */
+    /*     {1.0f, 0.0f}, */
+    /*     {0.5f, -std::sin((float)M_PI / 3.0f)}, */
+    /*     {-0.5f, -std::sin((float)M_PI / 3.0f)}, */
+    /*     {-1.0f, 0.0f}, */
+    /*     {0.0f, 0.0f} */
+    /* }}; */
+
+    const std::array<std::array<float, 2>, 25> basis = {{
+        {0.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.5f, -1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.0f, -2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, -1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, std::sin((float)M_PI/3.0f)},
+        {0.5f, std::sin((float)M_PI/3.0f)},
+        {1.0f, 0.0f},
+        {0.5f, -std::sin((float)M_PI/3.0f)},
+        {-0.5f, -std::sin((float)M_PI/3.0f)},
+        {-1.0f, 0.0f},
+        {0.0f, 4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.0f, -2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.0f, -4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.0f, -2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, 5.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.0f, 4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.5f, -1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.5f, -5.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.0f, -4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.0f, 0.0f}
+    }};
+
+
+
+    std::array<float, 4> init_bounds = {-1.0f, 1.0f, -1.0f, 1.0f};
+    /* std::array<std::array<float, 2>, 7> positions = {{ */
+    /*     {-0.5f, std::sin((float)M_PI / 3.0f)}, */
+    /*     {0.5f, std::sin((float)M_PI / 3.0f)}, */
+    /*     {1.0f, 0.0f}, */
+    /*     {0.5f, -std::sin((float)M_PI / 3.0f)}, */
+    /*     {-0.5f, -std::sin((float)M_PI / 3.0f)}, */
+    /*     {-1.0f, 0.0f}, */
+    /*     {0.0f, 0.0f} */
+    /* }}; */
+
+    std::array<std::array<float, 2>, 25> positions = {{
+        {0.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.5f, -1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.0f, -2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, -1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, std::sin((float)M_PI/3.0f)},
+        {0.5f, std::sin((float)M_PI/3.0f)},
+        {1.0f, 0.0f},
+        {0.5f, -std::sin((float)M_PI/3.0f)},
+        {-0.5f, -std::sin((float)M_PI/3.0f)},
+        {-1.0f, 0.0f},
+        {0.0f, 4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.0f, -2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.0f, -4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.0f, -2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-0.5f, 5.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.0f, 4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {1.5f, -1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.5f, -5.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.0f, -4.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {-1.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
+        {0.0f, 0.0f}
+    }};
+
+    /* std::array<float, 7> y; */
+    Eigen::VectorXf y = Eigen::VectorXf::Zero(25);
+    float sigma;
+    float speed;
+    Hexagon hexagon;
+
+    // define boundary type
+    void boundary_conditions() {
+        for (int i = 0; i < N; i++) {
+            std::array<float, 2> new_position = hexagon.call(
+                positions[i][0], positions[i][1]);
+            this->positions[i][0] = new_position[0];
+            this->positions[i][1] = new_position[1];
+        }
+    }
+
+    // gaussian distance of each position to the centers
+    void calc_activation() {
+        float dist_squared;
+        for (int i = 0; i < N; i++) {
+            dist_squared = std::pow(positions[i][0], 2) + \
+                std::pow(positions[i][1], 2);
+            y(i) = std::exp(-dist_squared / sigma);
+        }
+    }
+
+};
+
+
+class GridHexNetwork {
+
+public:
+
+    GridHexNetwork(std::vector<GridHexLayer> layers)
+        : layers(layers) {
+
+        // Initialize the variables
+        this->num_layers = layers.size();
+
+        int total_size = 0;
+        full_repr = "(";
+        for (auto& layer : layers) {
+                total_size += layer.len();
+                full_repr += layer.repr();
+            }
+        full_repr += ")";
+        this->N = total_size;
+        y = Eigen::VectorXf::Zero(N);
+        basis = Eigen::MatrixXf::Zero(total_size, 2);
+        positions = Eigen::MatrixXf::Zero(total_size, 2);
+
+        LOG("[+] GridHexNetwork created");
+    }
+
+    ~GridHexNetwork() { LOG("[-] GridHexNetwork destroyed"); }
+
+    Eigen::VectorXf call(const std::array<float, 2>& x) {
+        for (int i = 0; i < num_layers; i++) {
+            y.segment(i*layers[i].len(), layers[i].len()) = \
+                layers[i].call(x);
+        }
+
+        return y;
+    }
+
+    int len() const { return N; }
+    int get_num_layers() const { return num_layers; }
+    std::string str() const { return "GridNetwork"; }
+    std::string repr() const {
+        return str() + "(" + full_repr + ", N=" + \
+        std::to_string(N) + ")"; }
+    Eigen::VectorXf get_activation() const { return y; }
+    Eigen::MatrixXf get_centers() {
+        for (int i = 0; i < num_layers; i++) {
+            int layer_len = layers[i].len();
+            std::array<std::array<float, 2>, 25> layer_basis = \
+                layers[i].get_centers();
+
+            for (int j = 1; j < (layer_len+1); j++) {
+                 basis(i*layer_len+j, 0) = layer_basis[j][0];
+                 basis(i*layer_len+j, 1) = layer_basis[j][1];
+                 }
+        }
+        return basis;
+    }
+
+    Eigen::MatrixXf get_positions() {
+        for (int i = 0; i < num_layers; i++) {
+            int layer_len = layers[i].len();
+            std::array<std::array<float, 2>, 25> layer_positions = \
+                layers[i].get_positions();
+
+            for (int j = 1; j < (layer_len+1); j++) {
+                 positions(i*layer_len+j, 0) = layer_positions[j][0];
+                 positions(i*layer_len+j, 1) = layer_positions[j][1];
+                 }
+        }
+        return basis;
+    }
+
+private:
+    std::vector<GridHexLayer> layers;
+    int N;
+    int num_layers;
+    std::string full_repr;
+    Eigen::VectorXf y;
+    Eigen::MatrixXf basis;
+    Eigen::MatrixXf positions;
 };
 
 
@@ -1421,6 +1656,280 @@ private:
     float ach;
 
     GridNetwork xfilter;
+
+    // variables
+    Eigen::MatrixXf Wff;
+    Eigen::MatrixXf Wffbackup;
+    float delta_wff;
+    Eigen::MatrixXf Wrec;
+    Eigen::MatrixXf connectivity;
+    /* Eigen::MatrixXf centers; */
+    Eigen::VectorXf mask;
+    std::vector<int> fixed_indexes;
+    std::vector<int> free_indexes;
+    int cell_count;
+    Eigen::VectorXf u;
+    Eigen::VectorXf x_filtered;
+    Eigen::VectorXf trace;
+    Eigen::VectorXf pre_x;
+    Eigen::MatrixXf centers;
+
+    // @brief check if one of the fixed neurons
+    int check_fixed_indexes() {
+
+        // if there are no fixed neurons, return -1
+        if (fixed_indexes.size() == 0) {
+            return -1;
+        };
+
+        // loop through the fixed indexes's `u` value
+        // and return the index with the highest value
+        int max_idx = -1;
+        float max_u = 0.0;
+        for (int i = 0; i < fixed_indexes.size(); i++) {
+            if (u(fixed_indexes[i]) > max_u) {
+                max_u = u(fixed_indexes[i]);
+                max_idx = fixed_indexes[i];
+            };
+        };
+
+        if (max_u < (threshold * ach) ) { return -1; }
+        else {
+            DEBUG("Fixed index above threshold: " + \
+                std::to_string(max_u) + \
+                " [" + std::to_string(threshold) + "]");
+            return max_idx; };
+    }
+
+    // @brief Quantify the indexes.
+    void make_indexes() {
+
+        free_indexes.clear();
+        for (int i = 0; i < N; i++) {
+            if (Wff.row(i).sum() > threshold) {
+                fixed_indexes.push_back(i);
+            } else {
+                free_indexes.push_back(i);
+            }
+        }
+    }
+
+    // @brief calculate the recurrent connections
+    void update_recurrent() {
+        // connectivity matrix
+        connectivity = utils::connectivity_matrix(
+            Wff, rec_threshold
+        );
+
+        // similarity
+        Wrec = utils::cosine_similarity_matrix(Wff);
+
+        // weights
+        Wrec = Wrec.cwiseProduct(connectivity);
+    }
+
+};
+
+
+class PCNNgridhex {
+public:
+    PCNNgridhex(int N, int Nj, float gain, float offset,
+         float clip_min, float threshold,
+         float rep_threshold,
+         float rec_threshold,
+         int num_neighbors, float trace_tau,
+         GridHexNetwork xfilter, std::string name = "2D")
+        : N(N), Nj(Nj), gain(gain), offset(offset),
+        clip_min(clip_min), threshold(threshold),
+        rep_threshold(rep_threshold),
+        rec_threshold(rec_threshold),
+        num_neighbors(num_neighbors),
+        trace_tau(trace_tau),
+        xfilter(std::move(xfilter)),
+        name(name) {
+
+        // Initialize the variables
+        Wff = Eigen::MatrixXf::Zero(N, Nj);
+        Wffbackup = Eigen::MatrixXf::Zero(N, Nj);
+        Wrec = Eigen::MatrixXf::Zero(N, N);
+        connectivity = Eigen::MatrixXf::Zero(N, N);
+        centers = Eigen::MatrixXf::Zero(N, 2);
+        mask = Eigen::VectorXf::Zero(N);
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        delta_wff = 0.0;
+        x_filtered = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+        cell_count = 0;
+
+        ach = 1.0;
+
+        // make vector of free indexes
+        for (int i = 0; i < N; i++) {
+            free_indexes.push_back(i);
+        }
+        fixed_indexes = {};
+
+        LOG("[+] PCNNgridhex created");
+    }
+
+    ~PCNNgridhex() { LOG("[-] PCNNgridhex destroyed"); }
+
+    std::pair<Eigen::VectorXf,
+    Eigen::VectorXf> call(const std::array<float, 2>& v,
+                          const bool frozen = false,
+                          const bool traced = true) {
+
+        // pass the input through the filter layer
+        x_filtered = xfilter.call(v);
+
+        // forward it to the network by doing a dot product
+        // with the feedforward weights
+        u = Wff * x_filtered + pre_x;
+        u = utils::cosine_similarity_vector_matrix(
+                x_filtered, Wff);
+
+        Eigen::VectorXf sigma = \
+            Eigen::VectorXf::Constant(u.size(), 0.01);
+
+        // maybe use cosine similarity?
+        /* u = utils::gaussian_distance(x_filtered, Wff, sigma); */
+
+        u = utils::generalized_sigmoid_vec(u, offset,
+                                           gain, clip_min);
+
+        // update the trace
+        if (traced) {
+            trace = (1 - trace_tau) * trace + trace_tau * u;
+        }
+
+        // update model
+        /* if (!frozen) { */
+        /*     update(x_filtered); */
+        /* } */
+
+        /* return u; */
+        return std::make_pair(u, x_filtered);
+    }
+
+    // @brief update the model
+    void update(float x = -1.0, float y = -1.0) {
+
+        make_indexes();
+
+        // exit: a fixed neuron is above threshold
+        if (check_fixed_indexes() != -1) {
+            DEBUG("!Fixed index above threshold");
+           return void();
+        };
+
+        // exit: there are no free neurons
+        if (free_indexes.size() == 0) {
+            DEBUG("!No free neurons");
+            return void();
+        };
+
+        // pick new index
+        int idx = utils::random.get_random_element_vec(
+                                        free_indexes);
+        DEBUG("Picked index: " + std::to_string(idx));
+
+        // determine weight update
+        Eigen::VectorXf dw = x_filtered - Wff.row(idx).transpose();
+
+        // trim the weight update
+        /* delta_wff = (dw.array() > 0.01).select(dw, 0.0f); */
+
+        delta_wff = dw.norm();
+
+        if (delta_wff > 0.0) {
+
+            DEBUG("delta_wff: " + std::to_string(delta_wff));
+
+            // update weights
+            Wff.row(idx) += dw.transpose();
+
+            // calculate the similarity among the rows
+            float similarity = \
+                utils::max_cosine_similarity_in_rows(
+                    Wff, idx);
+
+            // check repulsion (similarity) level
+            if (similarity > (rep_threshold * ach)) {
+                Wff.row(idx) = Wffbackup.row(idx);
+                return void();
+            }
+
+            // update count and backup
+            cell_count++;
+            Wffbackup.row(idx) = Wff.row(idx);
+
+            // update recurrent connections
+            update_recurrent();
+
+            // record new center
+            centers.row(idx) = Eigen::Vector2f(x, y);
+        }
+
+    }
+
+   void fwd_ext(const std::array<float, 2>& x) {}
+   /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
+   /*      return call(x, true, false); */
+   /*  } */
+
+   Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
+        return Wrec * a + pre_x;
+    }
+
+    void reset() {
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+    }
+
+    // Getters
+    int len() const { return cell_count; }
+    int get_size() const { return N; }
+    std::string str() const { return "PCNNgridhex." + name; }
+    std::string repr() const {
+        return "PCNNgridhex(" + name + std::to_string(N) + \
+            std::to_string(Nj) + std::to_string(gain) + \
+            std::to_string(offset) + \
+            std::to_string(rec_threshold) + \
+            std::to_string(num_neighbors) + \
+            std::to_string(trace_tau) + ")";
+    }
+    Eigen::VectorXf representation() const { return u; }
+    Eigen::MatrixXf get_wff() const { return Wff; }
+    Eigen::MatrixXf get_wrec() const { return Wrec; }
+    Eigen::MatrixXf get_connectivity() const { return connectivity; }
+    Eigen::MatrixXf get_centers() const { return centers; }
+    Eigen::VectorXf get_trace() const { return trace; }
+    float get_delta_update() const { return delta_wff; }
+
+    // @brief modulate the density of new PCs
+    void ach_modulation(float ach) {
+        this->ach = ach;
+    }
+
+private:
+    // parameters
+    const int N;
+    const int Nj;
+    const float gain;
+    const float offset;
+    const float clip_min;
+    const float threshold;
+    const float rep_threshold;
+    const float rec_threshold;
+    const int num_neighbors;
+    const float trace_tau;
+    const std::string name;
+
+    float ach;
+
+    GridHexNetwork xfilter;
 
     // variables
     Eigen::MatrixXf Wff;

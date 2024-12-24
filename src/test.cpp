@@ -5,9 +5,11 @@
 #include <unordered_map>
 #include <iostream>
 #include <array>
+#include <cmath>
 
 #define LOG(msg) utils::logging.log(msg, "TEST")
 #define SPACE utils::logging.space
+
 
 
 // MAIN
@@ -30,7 +32,7 @@ int main() {
     /* pcl::test_layer(); */
     /* pcl::test_pcnn(); */
     /* pcl::test_randlayer(); */
-    pcl::test_gridlayer();
+    /* pcl::test_gridlayer(); */
 
     // test tanh
 
