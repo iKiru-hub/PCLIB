@@ -694,11 +694,17 @@ class GridHexLayer {
 
 public:
 
-    GridHexLayer(float sigma, float speed):
+    GridHexLayer(float sigma, float speed,
+                 float offset_dx = 0.0f, float offset_dy = 0.0f):
         sigma(sigma), speed(speed), hexagon(Hexagon()){
 
         // make matrix
         LOG("[+] GridHexLayer created");
+
+        // apply the offset by stepping
+        if (offset_dx != 0.0f && offset_dy != 0.0f) {
+            call({offset_dx, offset_dy});
+        }
     }
 
     ~GridHexLayer() { LOG("[-] GridHexLayer destroyed"); }
@@ -728,20 +734,15 @@ public:
     { return positions; }
     std::array<std::array<float, 2>, 25> get_centers()
     { return basis; }
+    void reset(std::array<float, 2> v) {
+        this->positions = basis;
+        call(v);
+    }
 
 
 private:
     const int N = 25;
 
-    /* const std::array<std::array<float, 2>, 7> basis = {{ */
-    /*     {-0.5f, std::sin((float)M_PI / 3.0f)}, */
-    /*     {0.5f, std::sin((float)M_PI / 3.0f)}, */
-    /*     {1.0f, 0.0f}, */
-    /*     {0.5f, -std::sin((float)M_PI / 3.0f)}, */
-    /*     {-0.5f, -std::sin((float)M_PI / 3.0f)}, */
-    /*     {-1.0f, 0.0f}, */
-    /*     {0.0f, 0.0f} */
-    /* }}; */
 
     const std::array<std::array<float, 2>, 25> basis = {{
         {0.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
@@ -770,20 +771,7 @@ private:
         {-1.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
         {0.0f, 0.0f}
     }};
-
-
-
     std::array<float, 4> init_bounds = {-1.0f, 1.0f, -1.0f, 1.0f};
-    /* std::array<std::array<float, 2>, 7> positions = {{ */
-    /*     {-0.5f, std::sin((float)M_PI / 3.0f)}, */
-    /*     {0.5f, std::sin((float)M_PI / 3.0f)}, */
-    /*     {1.0f, 0.0f}, */
-    /*     {0.5f, -std::sin((float)M_PI / 3.0f)}, */
-    /*     {-0.5f, -std::sin((float)M_PI / 3.0f)}, */
-    /*     {-1.0f, 0.0f}, */
-    /*     {0.0f, 0.0f} */
-    /* }}; */
-
     std::array<std::array<float, 2>, 25> positions = {{
         {0.0f, 2.0f/3.0f * std::sin((float)M_PI/3.0f)},
         {0.5f, 1.0f/3.0f * std::sin((float)M_PI/3.0f)},
@@ -910,6 +898,12 @@ public:
                  }
         }
         return basis;
+    }
+
+    void reset(std::array<float, 2> v) {
+        for (int i = 0; i < num_layers; i++) {
+            layers[i].reset(v);
+        }
     }
 
 private:
@@ -1511,7 +1505,8 @@ public:
         u = utils::cosine_similarity_vector_matrix(
                 x_filtered, Wff);
 
-        Eigen::VectorXf sigma = Eigen::VectorXf::Constant(u.size(), 0.01);
+        Eigen::VectorXf sigma = Eigen::VectorXf::Constant(u.size(),
+                                                          0.01);
 
         // maybe use cosine similarity?
         /* u = utils::gaussian_distance(x_filtered, Wff, sigma); */
@@ -1594,7 +1589,10 @@ public:
 
     }
 
-   void fwd_ext(const std::array<float, 2>& x) {}
+   Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
+        std::pair<Eigen::VectorXf, Eigen::VectorXf> ans = call(x);
+        return ans.first;
+    }
    /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
    /*      return call(x, true, false); */
    /*  } */
@@ -1762,7 +1760,7 @@ public:
         pre_x = Eigen::VectorXf::Zero(N);
         cell_count = 0;
 
-        ach = 1.0;
+        ach = 1.0f;
 
         // make vector of free indexes
         for (int i = 0; i < N; i++) {
@@ -1778,14 +1776,14 @@ public:
     std::pair<Eigen::VectorXf,
     Eigen::VectorXf> call(const std::array<float, 2>& v,
                           const bool frozen = false,
-                          const bool traced = true) {
+                          const bool traced = false) {
 
         // pass the input through the filter layer
         x_filtered = xfilter.call(v);
 
         // forward it to the network by doing a dot product
         // with the feedforward weights
-        u = Wff * x_filtered + pre_x;
+        /* u = Wff * x_filtered + pre_x; */
         u = utils::cosine_similarity_vector_matrix(
                 x_filtered, Wff);
 
@@ -1820,6 +1818,7 @@ public:
         // exit: a fixed neuron is above threshold
         if (check_fixed_indexes() != -1) {
             DEBUG("!Fixed index above threshold");
+            printf("(-)Fixed index above threshold\n");
            return void();
         };
 
@@ -1835,7 +1834,8 @@ public:
         DEBUG("Picked index: " + std::to_string(idx));
 
         // determine weight update
-        Eigen::VectorXf dw = x_filtered - Wff.row(idx).transpose();
+        Eigen::VectorXf dw = x_filtered - \
+            Wff.row(idx).transpose();
 
         // trim the weight update
         /* delta_wff = (dw.array() > 0.01).select(dw, 0.0f); */
@@ -1857,12 +1857,16 @@ public:
             // check repulsion (similarity) level
             if (similarity > (rep_threshold * ach)) {
                 Wff.row(idx) = Wffbackup.row(idx);
+                printf("(-)Repulsion [%f]{%f}\n", similarity,
+                       rep_threshold);
                 return void();
             }
 
             // update count and backup
             cell_count++;
             Wffbackup.row(idx) = Wff.row(idx);
+            printf("(:)cell_count: %d [%f]\n", cell_count,
+                   similarity);
 
             // update recurrent connections
             update_recurrent();
@@ -1873,10 +1877,14 @@ public:
 
     }
 
-   void fwd_ext(const std::array<float, 2>& x) {}
-   /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
-   /*      return call(x, true, false); */
-   /*  } */
+   /* void fwd_ext(const std::array<float, 2>& x) {} */
+   /* /1* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { *1/ */
+   /* /1*      return call(x, true, false); *1/ */
+   /* /1*  } *1/ */
+   Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
+        std::pair<Eigen::VectorXf, Eigen::VectorXf> ans = call(x);
+        return ans.first;
+    }
 
    Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
         return Wrec * a + pre_x;
@@ -1896,18 +1904,26 @@ public:
         return "PCNNgridhex(" + name + std::to_string(N) + \
             std::to_string(Nj) + std::to_string(gain) + \
             std::to_string(offset) + \
+            std::to_string(rep_threshold) + \
             std::to_string(rec_threshold) + \
             std::to_string(num_neighbors) + \
             std::to_string(trace_tau) + ")";
     }
-    Eigen::VectorXf representation() const { return u; }
+    Eigen::VectorXf get_activation() const { return u; }
+    Eigen::VectorXf get_activation_gcn() const {
+        return xfilter.get_activation(); }
     Eigen::MatrixXf get_wff() const { return Wff; }
     Eigen::MatrixXf get_wrec() const { return Wrec; }
     Eigen::MatrixXf get_connectivity() const { return connectivity; }
     Eigen::MatrixXf get_centers() const { return centers; }
     Eigen::VectorXf get_trace() const { return trace; }
     float get_delta_update() const { return delta_wff; }
-
+    Eigen::MatrixXf get_positions_gcn() {
+        return xfilter.get_positions();
+    }
+    void reset_gcn(std::array<float, 2> v) {
+        xfilter.reset(v);
+    }
     // @brief modulate the density of new PCs
     void ach_modulation(float ach) {
         this->ach = ach;
@@ -1972,6 +1988,8 @@ private:
             DEBUG("Fixed index above threshold: " + \
                 std::to_string(max_u) + \
                 " [" + std::to_string(threshold) + "]");
+            printf("(-)Fixed index above threshold [u=%f]{%f}\n",
+                   max_u, threshold);
             return max_idx; };
     }
 

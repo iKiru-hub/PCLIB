@@ -52,29 +52,36 @@ PYBIND11_MODULE(pclib, m) {
 
     // Grid layer with pre-defined hexagon layer
     py::class_<GridHexLayer>(m, "GridHexLayer")
-        .def(py::init<float, float>(),
+        .def(py::init<float, float, float, float>(),
              py::arg("sigma"),
-             py::arg("speed"))
+             py::arg("speed"),
+             py::arg("offset_dx") = 0.0f,
+             py::arg("offset_dy") = 0.0f)
         .def("__str__", &GridHexLayer::str)
         .def("__repr__", &GridHexLayer::repr)
         .def("__len__", &GridHexLayer::len)
-        .def("__call__", &GridHexLayer::call)
+        .def("__call__", &GridHexLayer::call,
+             py::arg("v"))
         .def("get_positions", &GridHexLayer::get_positions)
-        .def("get_centers", &GridHexLayer::get_centers);
+        .def("get_centers", &GridHexLayer::get_centers)
+        .def("reset", &GridHexLayer::reset,
+             py::arg("v"));
 
     // Grid Hexagonal Layer Network
     py::class_<GridHexNetwork>(m, "GridHexNetwork")
         .def(py::init<std::vector<GridHexLayer>>(),
              py::arg("layers"))
         .def("__call__", &GridHexNetwork::call,
-                py::arg("x"))
+                py::arg("v"))
         .def("__str__", &GridHexNetwork::str)
         .def("__repr__", &GridHexNetwork::repr)
         .def("__len__", &GridHexNetwork::len)
         .def("get_activation", &GridHexNetwork::get_activation)
         .def("get_centers", &GridHexNetwork::get_centers)
         .def("get_num_layers", &GridHexNetwork::get_num_layers)
-        .def("get_positions", &GridHexNetwork::get_positions);
+        .def("get_positions", &GridHexNetwork::get_positions)
+        .def("reset", &GridHexNetwork::reset,
+             py::arg("v"));
 
     // PCNN network model [Grid]
     py::class_<PCNNgridhex>(m, "PCNNgridhex")
@@ -96,7 +103,7 @@ PYBIND11_MODULE(pclib, m) {
         .def("__call__", &PCNNgridhex::call,
              py::arg("v"),
              py::arg("frozen") = false,
-             py::arg("traced") = true)
+             py::arg("traced") = false)
         .def("__str__", &PCNNgridhex::str)
         .def("__len__", &PCNNgridhex::len)
         .def("__repr__", &PCNNgridhex::repr)
@@ -105,17 +112,26 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("y") = -1.0)
         .def("ach_modulation", &PCNNgridhex::ach_modulation,
              py::arg("ach"))
+        .def("get_activation", &PCNNgridhex::get_activation)
+        .def("get_activation_gcn",
+             &PCNNgridhex::get_activation_gcn)
         .def("get_size", &PCNNgridhex::get_size)
         .def("get_trace", &PCNNgridhex::get_trace)
         .def("get_wff", &PCNNgridhex::get_wff)
         .def("get_wrec", &PCNNgridhex::get_wrec)
-        .def("get_connectivity", &PCNNgridhex::get_connectivity)
+        .def("get_connectivity",\
+             &PCNNgridhex::get_connectivity)
         .def("get_centers", &PCNNgridhex::get_centers)
-        .def("get_delta_update", &PCNNgridhex::get_delta_update)
+        .def("get_delta_update",\
+             &PCNNgridhex::get_delta_update)
+        .def("get_positions_gcn", \
+             &PCNNgridhex::get_positions_gcn)
         .def("fwd_ext", &PCNNgridhex::fwd_ext,
              py::arg("x"))
         .def("fwd_int", &PCNNgridhex::fwd_int,
-             py::arg("a"));
+             py::arg("a"))
+        .def("reset_gcn", &PCNNgridhex::reset_gcn,
+             py::arg("v"));
 
 
     // PCNN network model [Grid]
