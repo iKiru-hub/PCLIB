@@ -2377,9 +2377,7 @@ private:
 };
 
 
-// base modulation
-
-
+// base modulation | Dopamine & Boundary
 class BaseModulation{
     float output;
     std::string name;
@@ -2438,12 +2436,70 @@ public:
         return output;
     }
 
-    float get_value() { return output; }
+    float get_output() { return output; }
     std::vector<float> get_weights() { return weights; }
     float get_leaky_v() { return leaky.get_v(); }
     std::string str() { return name; }
     std::string repr() { return name + "(1D)"; }
     int len() { return size; }
+};
+
+// program 1 : maximum activity
+class PopulationMaxProgram {
+
+    float output;
+
+public:
+
+    PopulationMaxProgram() {}
+    ~PopulationMaxProgram() {}
+
+    float call(const std::vector<float>& u) {
+        output = *std::max_element(u.begin(), u.end());
+        return output;
+    }
+
+    float get_value() { return output; }
+    std::string str() { return "PopulationMaxProgram"; }
+    std::string repr() { return "PopulationMaxProgram"; }
+    int len() { return 1; }
+};
+
+
+
+class Circuits {
+
+    BaseModulation& da;
+    BaseModulation& bnd;
+    PopulationMaxProgram pmax;
+
+    std::array<float, 3> output;
+
+public:
+
+    Circuits(BaseModulation& da, BaseModulation& bnd):
+        da(da), bnd(bnd), pmax(PopulationMaxProgram()) {}
+
+    ~Circuits() {}
+
+    std::array<float, 3> call(const std::vector<float>& u,
+                                         float collision,
+                                         float reward,
+                                         bool simulate = false) {
+
+        output[0] = da.call(u, reward, simulate);
+        output[1] = bnd.call(u, collision, simulate);
+        output[2] = pmax.call(u);
+
+        return output;
+    }
+
+    std::string str() { return "Circuits"; }
+    std::string repr() { return "Circuits"; }
+    int len() { return 3; }
+    std::array<float, 3> get_output() { return output; }
+    std::array<float, 2> get_leaky_v() {
+        return {da.get_leaky_v(), bnd.get_leaky_v()}; }
 };
 
 

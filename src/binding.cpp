@@ -368,9 +368,24 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("u"),
              py::arg("x") = 0.0f,
              py::arg("simulate") = false)
-        .def("get_value", &BaseModulation::get_value)
+        .def("get_output", &BaseModulation::get_output)
         .def("get_leaky_v", &BaseModulation::get_leaky_v)
         .def("get_weights", &BaseModulation::get_weights);
+
+    py::class_<Circuits>(m, "Circuits")
+        .def(py::init<BaseModulation&, BaseModulation&>(),
+             py::arg("da"),
+             py::arg("bnd"))
+        .def("__str__", &Circuits::str)
+        .def("__repr__", &Circuits::repr)
+        .def("__len__", &Circuits::len)
+        .def("__call__", &Circuits::call,
+             py::arg("u"),
+             py::arg("collision"),
+             py::arg("reward"),
+             py::arg("simulate") = false)
+        .def("get_output", &Circuits::get_output)
+        .def("get_leaky_v", &Circuits::get_leaky_v);
 
 
     /* ACTION SAMPLING MODULE */
