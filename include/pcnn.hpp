@@ -211,6 +211,15 @@ public:
     }
 };
 
+struct GSparams {
+    float offset;
+    float gain;
+    float clip;
+
+    GSparams(float offset, float gain, float clip):
+        offset(offset), gain(gain), clip(clip) {}
+};
+
 
 /* ========================================== */
 /* ============== INPUT LAYER =============== */
@@ -453,10 +462,61 @@ public:
         return y;
     }
 
+    Eigen::VectorXf fwd_position(
+        const std::array<float, 2>& v) {
+
+        /* Eigen::MatrixXf new_positions = Eigen::MatrixXf::Zero(N, 2); */
+        /* std::array<std::array<float, 2>, 25> new_positions; */
+        Eigen::MatrixXf new_positions;
+        /* new_positions.col(0) = positions.col(0) + speed * \ */
+            /* v[0]; */
+        /* new_positions.col(1) = positions.col(1) + speed * \ */
+            /* v[1]; */
+        for (int i = 0; i < N; i++) {
+            new_positions(i, 0) = positions(i, 0) + \
+                speed * (v[0] - positions(i, 0));
+            new_positions(i, 1) = positions(i, 1) + \
+                speed * (v[1] - positions(i, 1));
+        }
+
+        // check boundary conditions
+        /* for (int i = 0; i < N; i++) { */
+        /*     std::array<float, 2> new_position = hexagon.call( */
+        /*         new_positions[i][0], new_positions[i][1]); */
+
+        /*     new_positions[i][0] = new_position[0]; */
+        /*     new_positions[i][1] = new_position[1]; */
+            /* std::array<float, 2> new_position = hexagon.call( */
+            /*     new_positions(i, 0), new_positions(i, 1)); */
+            /* new_positions(i, 0) = new_position[0]; */
+            /* new_positions(i, 1) = new_position[1]; */
+        /* } */
+
+        boundary_conditions(new_positions);
+
+        // compute the activation
+        Eigen::VectorXf yfwd = Eigen::VectorXf::Zero(N);
+        float dist_squared;
+        for (int i = 0; i < N; i++) {
+            /* dist_squared = std::pow(new_positions(i, 0), 2) + \ */
+            /*     std::pow(new_positions(i, 1), 2); */
+            dist_squared = std::pow(new_positions(i, 0),
+                                    2) + \
+                std::pow(new_positions(i, 1), 2);
+            yfwd(i) = std::exp(-dist_squared / sigma);
+        }
+
+        return yfwd;
+    }
+
     std::string str() const { return "GridLayer"; }
     std::string repr() const { return "GridLayer(" + \
         boundary_type + ", " + basis_type + ")"; }
     Eigen::MatrixXf get_positions() { return positions; }
+    void reset(std::array<float, 2> v) {
+        this->positions = basis;
+        call(v);
+    }
 
 private:
     Eigen::MatrixXf positions;
@@ -559,6 +619,15 @@ private:
     }
 
     // define boundary type
+    void boundary_conditions(Eigen::MatrixXf& pos) {
+        for (int i = 0; i < N; i++) {
+            std::array<float, 2> new_position = \
+                apply_boundary(pos(i, 0), pos(i, 1));
+            pos(i, 0) = new_position[0];
+            pos(i, 1) = new_position[1];
+        }
+    }
+    // define boundary type
     void boundary_conditions() {
         for (int i = 0; i < N; i++) {
             std::array<float, 2> new_position = apply_boundary(
@@ -654,6 +723,18 @@ public:
         return y;
     }
 
+    Eigen::VectorXf fwd_position(
+        const std::array<float, 2>& v) {
+
+        Eigen::VectorXf yfwd = Eigen::VectorXf::Zero(N);
+        for (int i = 0; i < num_layers; i++) {
+            yfwd.segment(i*layers[i].len(), layers[i].len()) = \
+                layers[i].fwd_position(v);
+        }
+
+        return yfwd;
+    }
+
     int len() const { return N; }
     int get_num_layers() const { return num_layers; }
     std::string str() const { return "GridNetwork"; }
@@ -669,7 +750,6 @@ public:
         }
         return basis;
     }
-
     Eigen::MatrixXf get_positions() {
         for (int i = 0; i < num_layers; i++) {
             basis.block(i*layers[i].len(),
@@ -677,6 +757,12 @@ public:
                 layers[i].get_positions();
         }
         return basis;
+    }
+
+    void reset(std::array<float, 2> v) {
+        for (int i = 0; i < num_layers; i++) {
+            layers[i].reset(v);
+        }
     }
 
 private:
@@ -695,7 +781,8 @@ class GridHexLayer {
 public:
 
     GridHexLayer(float sigma, float speed,
-                 float offset_dx = 0.0f, float offset_dy = 0.0f):
+                 float offset_dx = 0.0f,
+                 float offset_dy = 0.0f):
         sigma(sigma), speed(speed), hexagon(Hexagon()){
 
         // make matrix
@@ -725,6 +812,48 @@ public:
         // compute the activation
         calc_activation();
         return y;
+    }
+
+    Eigen::VectorXf fwd_position(
+        const std::array<float, 2>& v) {
+
+        /* Eigen::MatrixXf new_positions = Eigen::MatrixXf::Zero(N, 2); */
+        std::array<std::array<float, 2>, 25> new_positions;
+        /* new_positions.col(0) = positions.col(0) + speed * \ */
+            /* v[0]; */
+        /* new_positions.col(1) = positions.col(1) + speed * \ */
+            /* v[1]; */
+        for (int i = 0; i < N; i++) {
+            new_positions[i][0] = positions[i][0] + \
+                speed * (v[0] - positions[i][0]);
+            new_positions[i][1] = positions[i][1] + \
+                speed * (v[1] - positions[i][1]);
+        }
+
+        // check boundary conditions
+        for (int i = 0; i < N; i++) {
+            std::array<float, 2> new_position = hexagon.call(
+                new_positions[i][0], new_positions[i][1]);
+            new_positions[i][0] = new_position[0];
+            new_positions[i][1] = new_position[1];
+            /* std::array<float, 2> new_position = hexagon.call( */
+            /*     new_positions(i, 0), new_positions(i, 1)); */
+            /* new_positions(i, 0) = new_position[0]; */
+            /* new_positions(i, 1) = new_position[1]; */
+        }
+
+        // compute the activation
+        Eigen::VectorXf yfwd = Eigen::VectorXf::Zero(N);
+        float dist_squared;
+        for (int i = 0; i < N; i++) {
+            /* dist_squared = std::pow(new_positions(i, 0), 2) + \ */
+            /*     std::pow(new_positions(i, 1), 2); */
+            dist_squared = std::pow(new_positions[i][0], 2) + \
+                std::pow(new_positions[i][1], 2);
+            yfwd(i) = std::exp(-dist_squared / sigma);
+        }
+
+        return yfwd;
     }
 
     int len() const { return N; }
@@ -863,6 +992,18 @@ public:
         }
 
         return y;
+    }
+
+    Eigen::VectorXf fwd_position(
+        const std::array<float, 2>& x) {
+
+        Eigen::VectorXf yfwd = Eigen::VectorXf::Zero(N);
+        for (int i = 0; i < num_layers; i++) {
+            yfwd.segment(i*layers[i].len(), layers[i].len()) = \
+                layers[i].fwd_position(x);
+        }
+
+        return yfwd;
     }
 
     int len() const { return N; }
@@ -1589,17 +1730,39 @@ public:
 
     }
 
-   Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
-        std::pair<Eigen::VectorXf, Eigen::VectorXf> ans = call(x);
-        return ans.first;
-    }
    /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
-   /*      return call(x, true, false); */
+   /*      std::pair<Eigen::VectorXf, Eigen::VectorXf> ans = call(x); */
+   /*      return ans.first; */
    /*  } */
+   Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
+
+        // pass the input through the filter layer
+        x_filtered = xfilter.fwd_position(x);
+
+        // forward it to the network by doing a dot product
+        // with the feedforward weights
+        u = utils::cosine_similarity_vector_matrix(
+                x_filtered, Wff);
+
+        Eigen::VectorXf sigma = \
+            Eigen::VectorXf::Constant(u.size(), 0.01);
+
+        // maybe use cosine similarity?
+        return utils::generalized_sigmoid_vec(u, offset,
+                                           gain, clip_min);
+    }
 
    Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
         return Wrec * a + pre_x;
     }
+
+   /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
+   /*      return call(x, true, false); */
+   /*  } */
+
+   /* Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) { */
+        /* return Wrec * a + pre_x; */
+    /* } */
 
     void reset() {
         u = Eigen::VectorXf::Zero(N);
@@ -1619,13 +1782,21 @@ public:
             std::to_string(num_neighbors) + \
             std::to_string(trace_tau) + ")";
     }
-    Eigen::VectorXf representation() const { return u; }
+    Eigen::VectorXf get_activation() const { return u; }
+    Eigen::VectorXf get_activation_gcn() const {
+        return xfilter.get_activation(); }
     Eigen::MatrixXf get_wff() const { return Wff; }
     Eigen::MatrixXf get_wrec() const { return Wrec; }
     Eigen::MatrixXf get_connectivity() const { return connectivity; }
     Eigen::MatrixXf get_centers() const { return centers; }
     Eigen::VectorXf get_trace() const { return trace; }
     float get_delta_update() const { return delta_wff; }
+    Eigen::MatrixXf get_positions_gcn() {
+        return xfilter.get_positions();
+    }
+    void reset_gcn(std::array<float, 2> v) {
+        xfilter.reset(v);
+    }
 
     /* Eigen::MatrixXf get_centers() { */
     /*     return utils::calc_centers_from_layer( */
@@ -1818,7 +1989,7 @@ public:
         // exit: a fixed neuron is above threshold
         if (check_fixed_indexes() != -1) {
             DEBUG("!Fixed index above threshold");
-            printf("(-)Fixed index above threshold\n");
+            /* printf("(-)Fixed index above threshold\n"); */
            return void();
         };
 
@@ -1857,16 +2028,16 @@ public:
             // check repulsion (similarity) level
             if (similarity > (rep_threshold * ach)) {
                 Wff.row(idx) = Wffbackup.row(idx);
-                printf("(-)Repulsion [%f]{%f}\n", similarity,
-                       rep_threshold);
+                /* printf("(-)Repulsion [%f]{%f}\n", similarity, */
+                       /* rep_threshold); */
                 return void();
             }
 
             // update count and backup
             cell_count++;
             Wffbackup.row(idx) = Wff.row(idx);
-            printf("(:)cell_count: %d [%f]\n", cell_count,
-                   similarity);
+            /* printf("(:)cell_count: %d [%f]\n", cell_count, */
+                   /* similarity); */
 
             // update recurrent connections
             update_recurrent();
@@ -1881,9 +2052,24 @@ public:
    /* /1* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { *1/ */
    /* /1*      return call(x, true, false); *1/ */
    /* /1*  } *1/ */
+   /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
+   /*      std::pair<Eigen::VectorXf, Eigen::VectorXf> ans = call(x); */
    Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
-        std::pair<Eigen::VectorXf, Eigen::VectorXf> ans = call(x);
-        return ans.first;
+
+        // pass the input through the filter layer
+        x_filtered = xfilter.fwd_position(x);
+
+        // forward it to the network by doing a dot product
+        // with the feedforward weights
+        u = utils::cosine_similarity_vector_matrix(
+                x_filtered, Wff);
+
+        Eigen::VectorXf sigma = \
+            Eigen::VectorXf::Constant(u.size(), 0.01);
+
+        // maybe use cosine similarity?
+        return utils::generalized_sigmoid_vec(u, offset,
+                                           gain, clip_min);
     }
 
    Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
@@ -1988,8 +2174,8 @@ private:
             DEBUG("Fixed index above threshold: " + \
                 std::to_string(max_u) + \
                 " [" + std::to_string(threshold) + "]");
-            printf("(-)Fixed index above threshold [u=%f]{%f}\n",
-                   max_u, threshold);
+            /* printf("(-)Fixed index above threshold [u=%f]{%f}\n", */
+                   /* max_u, threshold); */
             return max_idx; };
     }
 
@@ -2118,8 +2304,11 @@ public:
 
         v = v + (eq - v) * tau + x;
 
+        /* if (v < min_v) { */
+        /*     v = min_v; */
+        /* } */
         if (v < min_v) {
-            v = min_v;
+            v = 0.0f;
         }
         return v;
     }
@@ -2185,6 +2374,76 @@ private:
     float baseline;
     float theta;
     float dtheta;
+};
+
+
+// base modulation
+
+
+class BaseModulation{
+    float output;
+    std::string name;
+    int size;
+    float lr;
+    float threshold;
+    std::vector<float> weights;
+    LeakyVariable1D leaky;
+    GSparams gsparams;
+
+public:
+
+    BaseModulation(std::string name, int size, float lr,
+             float threshold, float offset, float gain,
+             float clip, float eq, float tau,
+             float min_v = 0.0f):
+        name(name), size(size), weights(size, 0.0f),
+        threshold(threshold), gsparams(offset, gain, clip),
+        lr(lr), leaky(LeakyVariable1D(name, eq, tau, min_v)) {}
+
+    ~BaseModulation() {}
+
+    float call(const std::vector<float>& u,
+               float x = 0.0f, bool simulate = false) {
+
+        // forward to the leaky variable
+        float v = leaky.call(x, simulate);
+
+        // update the weights
+        if (!simulate) {
+            for (int i = 0; i < size; i++) {
+                float ui = u[i] > threshold ? u[i] : 0.0;
+                weights[i] += lr * v * ui;
+
+                // clip the weights in (0, 1)
+                if (weights[i] < 0.0) {
+                    weights[i] = 0.0;
+                } else if (weights[i] > 1.0) {
+                    weights[i] = 1.0;
+                }
+            }
+        }
+
+        // compute the output
+        output = 0.0;
+        for (int i = 0; i < size; i++) {
+            output += weights[i] * u[i];
+        }
+
+        // apply activation function
+        output = utils::generalized_sigmoid(output,
+                                            gsparams.offset,
+                                            gsparams.gain,
+                                            gsparams.clip);
+
+        return output;
+    }
+
+    float get_value() { return output; }
+    std::vector<float> get_weights() { return weights; }
+    float get_leaky_v() { return leaky.get_v(); }
+    std::string str() { return name; }
+    std::string repr() { return name + "(1D)"; }
+    int len() { return size; }
 };
 
 

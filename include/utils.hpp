@@ -223,6 +223,24 @@ inline Eigen::VectorXf generalized_sigmoid_vec(
     return (result.array() >= clip).select(result, 0.0f);
 }
 
+inline std::vector<float> generalized_sigmoid_vec(
+    const std::vector<float>& x,
+    float offset = 1.0f,
+    float gain = 1.0f,
+    float clip = 0.0f) {
+
+    // Offset each element by `offset`, apply the gain,
+    // and then compute the sigmoid
+    std::vector<float> result;
+    for (size_t i = 0; i < x.size(); i++) {
+        float val = 1.0f / (1.0f + \
+            exp(-gain * (x[i] - offset)));
+        result.push_back(val >= clip ? val : 0.0f);
+    }
+
+    return result;
+}
+
 // @brief like above with float
 float generalized_sigmoid(const float x,
     float offset = 1.0f,
@@ -403,6 +421,17 @@ Eigen::VectorXf linspace(float start, float end, int num)
     }
 
     return linspaced;
+}
+
+// @brief threshold a vector
+std::vector<float> threshold_vector(const std::vector<float>& vec,
+                                    float threshold,
+                                    float min_value = 0.0f) {
+    std::vector<float> result;
+    for (size_t i = 0; i < vec.size(); i++) {
+        result.push_back(vec[i] > threshold ? vec[i] : min_value);
+    }
+    return result;
 }
 
 

@@ -34,7 +34,9 @@ PYBIND11_MODULE(pclib, m) {
         .def("__len__", &GridLayer::len)
         .def("get_centers", &GridLayer::get_centers)
         .def("get_activation", &GridLayer::get_activation)
-        .def("get_positions", &GridLayer::get_positions);
+        .def("get_positions", &GridLayer::get_positions)
+        .def("reset", &GridLayer::reset,
+             py::arg("v"));
 
     // Grid Layer Network
     py::class_<GridNetwork>(m, "GridNetwork")
@@ -45,6 +47,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("__str__", &GridNetwork::str)
         .def("__repr__", &GridNetwork::repr)
         .def("__len__", &GridNetwork::len)
+        .def("fwd_position", &GridNetwork::fwd_position,
+                py::arg("v"))
         .def("get_activation", &GridNetwork::get_activation)
         .def("get_centers", &GridNetwork::get_centers)
         .def("get_num_layers", &GridNetwork::get_num_layers)
@@ -76,6 +80,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("__str__", &GridHexNetwork::str)
         .def("__repr__", &GridHexNetwork::repr)
         .def("__len__", &GridHexNetwork::len)
+        .def("fwd_position", &GridHexNetwork::fwd_position,
+                py::arg("v"))
         .def("get_activation", &GridHexNetwork::get_activation)
         .def("get_centers", &GridHexNetwork::get_centers)
         .def("get_num_layers", &GridHexNetwork::get_num_layers)
@@ -161,6 +167,9 @@ PYBIND11_MODULE(pclib, m) {
         .def("update", &PCNNgrid::update,
              py::arg("x") = -1.0,
              py::arg("y") = -1.0)
+        .def("get_activation", &PCNNgrid::get_activation)
+        .def("get_activation_gcn",
+             &PCNNgrid::get_activation_gcn)
         .def("ach_modulation", &PCNNgrid::ach_modulation,
              py::arg("ach"))
         .def("get_size", &PCNNgrid::get_size)
@@ -173,7 +182,9 @@ PYBIND11_MODULE(pclib, m) {
         .def("fwd_ext", &PCNNgrid::fwd_ext,
              py::arg("x"))
         .def("fwd_int", &PCNNgrid::fwd_int,
-             py::arg("a"));
+             py::arg("a"))
+        .def("reset_gcn", &PCNNgrid::reset_gcn,
+             py::arg("v"));
 
     // (InputFilter) Random Layer
     py::class_<RandLayer>(m, "RandLayer")
@@ -334,6 +345,33 @@ PYBIND11_MODULE(pclib, m) {
         .def("__call__", &DensityMod::call,
              py::arg("x"))
         .def("get_value", &DensityMod::get_value);
+
+    /* MODULATION */
+    py::class_<BaseModulation>(m, "BaseModulation")
+        .def(py::init<std::string, int, float, float,
+             float, float, float, float, float,
+             float>(),
+             py::arg("name"),
+             py::arg("size"),
+             py::arg("lr") = 0.1f,
+             py::arg("threshod") = 0.0f,
+             py::arg("offset") = 0.0f,
+             py::arg("gain") = 5.0f,
+             py::arg("clip") = 0.001f,
+             py::arg("eq") = 0.0f,
+             py::arg("tau") = 5.0f,
+             py::arg("min_v") = 0.01f)
+        .def("__str__", &BaseModulation::str)
+        .def("__repr__", &BaseModulation::repr)
+        .def("__len__", &BaseModulation::len)
+        .def("__call__", &BaseModulation::call,
+             py::arg("u"),
+             py::arg("x") = 0.0f,
+             py::arg("simulate") = false)
+        .def("get_value", &BaseModulation::get_value)
+        .def("get_leaky_v", &BaseModulation::get_leaky_v)
+        .def("get_weights", &BaseModulation::get_weights);
+
 
     /* ACTION SAMPLING MODULE */
 
