@@ -5,6 +5,7 @@
 #include <array>
 #include <ctime>
 #include <cmath>
+#include <numeric>
 #include <algorithm>
 #include <iterator>
 
@@ -282,6 +283,34 @@ int arr_argmax(std::array<float, N> arr) {
 inline float cosine_similarity_vec(const Eigen::VectorXf& v1,
                                    const Eigen::VectorXf& v2) {
     return v1.dot(v2) / (v1.norm() * v2.norm());
+}
+inline float cosine_similarity_vec(const std::vector<float>& v1,
+                                   const std::vector<float>& v2) {
+    // Ensure the vectors are of the same size
+    if (v1.size() != v2.size()) {
+        throw std::invalid_argument("Vectors must be of the same size.");
+    }
+
+    // Calculate dot product
+    float dot_product = std::inner_product(v1.begin(),
+                                           v1.end(), v2.begin(), 0.0f);
+
+    // Calculate norms of the vectors
+    float norm_v1 = std::sqrt(std::inner_product(v1.begin(),
+                                                 v1.end(),
+                                                 v1.begin(), 0.0f));
+    float norm_v2 = std::sqrt(std::inner_product(v2.begin(),
+                                                 v2.end(),
+                                                 v2.begin(), 0.0f));
+
+    // Handle potential division by zero
+    if (norm_v1 == 0.0f || norm_v2 == 0.0f) {
+        throw std::invalid_argument(
+            "Vectors must not have zero magnitude.");
+    }
+
+    // Return cosine similarity
+    return dot_product / (norm_v1 * norm_v2);
 }
 
 // @brief cosine similarity between a vector and each

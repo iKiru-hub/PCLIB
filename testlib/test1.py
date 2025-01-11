@@ -294,6 +294,25 @@ def test_hexagon():
     hex = pclib.Hexagon()
 
 
+def test_base_modulators():
+
+    da = pclib.BaseModulation(name="DA", size=3, min_v=0.1,
+                              offset=0.01, gain=200.0)
+
+    bnd = pclib.BaseModulation(name="BND", size=3, min_v=0.1,
+                               offset=0.01, gain=200.0)
+
+    cir = pclib.Circuits(da, bnd)
+
+    obs = [[0.3, 0., 0.], 1.0, 1.0, False]
+    obs = [[0.3, 0., 0.], 1.0, 1.0, False]
+    obs = [[0.3, 0., 0.], 1.0, 1.0, False]
+
+    out1 = np.around(cir(*obs), 2)
+
+    assert out1[0] == 0.45, f"DA modulation is not correct {out1[0]}"
+
+
 
 if __name__ == "__main__":
     test_leakyND()

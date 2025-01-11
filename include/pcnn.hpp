@@ -180,10 +180,10 @@ public:
         centers[4] = {-0.5, 0.86602540378f};
         centers[5] = {-1.0f, 0.0f};
 
-        LOG("[+] hexagon created");
+        /* LOG("[+] hexagon created"); */
     }
 
-    ~Hexagon() { LOG("[-] hexagon destroyed"); }
+    ~Hexagon() {} // LOG("[-] hexagon destroyed"); }
 
     // @brief call: apply the boundary conditions
     std::array<float, 2> call(float x, float y) {
@@ -786,7 +786,7 @@ public:
         sigma(sigma), speed(speed), hexagon(Hexagon()){
 
         // make matrix
-        LOG("[+] GridHexLayer created");
+        /* LOG("[+] GridHexLayer created"); */
 
         // apply the offset by stepping
         if (offset_dx != 0.0f && offset_dy != 0.0f) {
@@ -794,7 +794,7 @@ public:
         }
     }
 
-    ~GridHexLayer() { LOG("[-] GridHexLayer destroyed"); }
+    ~GridHexLayer() {} //LOG("[-] GridHexLayer destroyed"); }
 
     // @brief call the GridLayer with a 2D input
     Eigen::VectorXf \
@@ -980,10 +980,10 @@ public:
         basis = Eigen::MatrixXf::Zero(total_size, 2);
         positions = Eigen::MatrixXf::Zero(total_size, 2);
 
-        LOG("[+] GridHexNetwork created");
+        /* LOG("[+] GridHexNetwork created"); */
     }
 
-    ~GridHexNetwork() { LOG("[-] GridHexNetwork destroyed"); }
+    ~GridHexNetwork() {} // LOG("[-] GridHexNetwork destroyed"); }
 
     Eigen::VectorXf call(const std::array<float, 2>& x) {
         for (int i = 0; i < num_layers; i++) {
@@ -2076,6 +2076,22 @@ public:
         return Wrec * a + pre_x;
     }
 
+    /* std::vector<float> fwd_int(const std::vector<float>& a) { */
+
+    /*     // convert Wrec into a float vector */
+    /*     float *data = Wrec.data(); */
+    /*     std::vector<float> Wrec_vec(data, data + Wrec.size()); */
+
+    /*     std::vector<float> out; */
+
+    /*     // activation */
+    /*     std::vector<float> res = Wrec_vec * a + pre_x; */
+    /*     for (size_t i = 0; i < res.size(); i++) { */
+    /*         out.push_back(res(i)); */
+    /*     } */
+    /*     return out; */
+    /* } */
+
     void reset() {
         u = Eigen::VectorXf::Zero(N);
         trace = Eigen::VectorXf::Zero(N);
@@ -2205,6 +2221,7 @@ private:
         // weights
         Wrec = Wrec.cwiseProduct(connectivity);
     }
+
 
 };
 
@@ -2384,7 +2401,8 @@ class BaseModulation{
     int size;
     float lr;
     float threshold;
-    std::vector<float> weights;
+    /* std::vector<float> weights; */
+    Eigen::VectorXf weights;
     LeakyVariable1D leaky;
     GSparams gsparams;
 
@@ -2394,13 +2412,16 @@ public:
              float threshold, float offset, float gain,
              float clip, float eq, float tau,
              float min_v = 0.0f):
-        name(name), size(size), weights(size, 0.0f),
+        name(name), size(size),
         threshold(threshold), gsparams(offset, gain, clip),
-        lr(lr), leaky(LeakyVariable1D(name, eq, tau, min_v)) {}
+        lr(lr), leaky(LeakyVariable1D(name, eq, tau, min_v))
+    { weights = Eigen::VectorXf::Zero(size); }
 
     ~BaseModulation() {}
 
-    float call(const std::vector<float>& u,
+    /* float call(const std::vector<float>& u, */
+    /*            float x = 0.0f, bool simulate = false) { */
+    float call(const Eigen::VectorXf& u,
                float x = 0.0f, bool simulate = false) {
 
         // forward to the leaky variable
@@ -2437,7 +2458,14 @@ public:
     }
 
     float get_output() { return output; }
-    std::vector<float> get_weights() { return weights; }
+    /* std::vector<float> get_weights() { return weights; } */
+    Eigen::VectorXf get_weights() {
+        Eigen::VectorXf w(size);
+        for (int i = 0; i < size; i++) {
+            w(i) = weights[i];
+        }
+        return w;
+    }
     float get_leaky_v() { return leaky.get_v(); }
     std::string str() { return name; }
     std::string repr() { return name + "(1D)"; }
@@ -2454,7 +2482,7 @@ public:
     PopulationMaxProgram() {}
     ~PopulationMaxProgram() {}
 
-    float call(const std::vector<float>& u) {
+    float call(const Eigen::VectorXf& u) {
         output = *std::max_element(u.begin(), u.end());
         return output;
     }
@@ -2464,7 +2492,6 @@ public:
     std::string repr() { return "PopulationMaxProgram"; }
     int len() { return 1; }
 };
-
 
 
 class Circuits {
@@ -2482,7 +2509,7 @@ public:
 
     ~Circuits() {}
 
-    std::array<float, 3> call(const std::vector<float>& u,
+    std::array<float, 3> call(const Eigen::VectorXf& u,
                                          float collision,
                                          float reward,
                                          bool simulate = false) {
@@ -2500,6 +2527,104 @@ public:
     std::array<float, 3> get_output() { return output; }
     std::array<float, 2> get_leaky_v() {
         return {da.get_leaky_v(), bnd.get_leaky_v()}; }
+};
+
+
+// target program
+class TargetProgram {
+
+    float threshold1;
+    float threshold2;
+    bool active;
+    int max_depth;
+    int size;
+    float speed;
+    Eigen::VectorXf trg_representation;
+    PCNNgridhex& space;
+    BaseModulation& modulator;
+
+    std::tuple<Eigen::VectorXf, bool> converge_to_location(
+        Eigen::VectorXf& representation,
+        int depth, Eigen::VectorXf& modulation) {
+
+        // recurrent step in the space
+        Eigen::VectorXf u = space.fwd_int(representation);
+
+        float similarity = utils::cosine_similarity_vec(
+            representation, u);
+
+        if (similarity > threshold2) {
+            return std::make_tuple(u, true);
+        } else if (depth > max_depth) {
+            return std::make_tuple(u, false);
+        }
+
+        return converge_to_location(u, depth+1, modulation);
+    }
+
+public:
+
+    TargetProgram(float threshold1,
+                  float speed,
+                  PCNNgridhex& space,
+                  BaseModulation& modulator,
+                  int max_depth = 20,
+                  float threshold2=0.8):
+        threshold1(threshold1), threshold2(threshold2),
+        speed(speed), space(space), modulator(modulator),
+        active(false), size(space.len()){
+
+        trg_representation = Eigen::VectorXf::Zero(size);
+
+        LOG("[+] TargetProgram created");
+    }
+
+    ~TargetProgram() { LOG("[-] TargetProgram destroyed"); }
+
+    // attempt to define a target representation
+    void update(float activation) {
+
+        /*
+        trg_repr <- converge(modulation)
+        enabled
+        --
+        value <- compare velocities()
+        */
+
+        active = activation > threshold1;
+        Eigen::VectorXf modulation = modulator.get_weights();
+
+        if (active) {
+            Eigen::VectorXf representation(size);
+            auto [trg_representation, active] = \
+                converge_to_location(representation,
+                                     0, modulation);
+        };
+    }
+
+    // quantify how similar a given representation is to the
+    // target representation
+    float evaluate(Eigen::VectorXf& next_representation,
+                   Eigen::VectorXf& curr_representation) {
+
+        if (!active) { return 0.0f; };
+        Eigen::VectorXf next_vector = curr_representation - \
+            trg_representation;
+        Eigen::VectorXf trg_vector = next_representation - \
+            trg_representation;
+        return utils::cosine_similarity_vec(next_vector,
+                                            trg_vector);
+    }
+
+    Eigen::VectorXf get_trg_representation() {
+        return trg_representation;
+    };
+
+    /* float get_trigger_var() { return trigger_var; } */
+
+    std::string str() { return "TargetProgram"; }
+    std::string repr() { return "TargetProgram"; }
+    int len() { return 1; }
 };
 
 
@@ -2573,6 +2698,12 @@ public:
 
     // @brief get values for the samples
     const std::array<float, 9> get_values() { return values; }
+
+    // @brief random one-time sampling
+    std::array<float, 2> sample_once() {
+        int idx = utils::random.get_random_int(0, num_samples);
+        return samples[idx];
+    }
 
     void reset() {
         idx = -1;
@@ -2753,6 +2884,47 @@ class ExperienceModule {
 
 };
 
+
+
+/* ========================================== */
+/* ================= BRAIN ================== */
+/* ========================================== */
+
+
+class Brain {
+
+    BaseModulation& modulator;
+    PCNNgridhex& space;
+    ActionSampling2D& action_space;
+
+public:
+
+    Brain(BaseModulation& modulator,
+          PCNNgridhex& space,
+          ActionSampling2D& action_space):
+        modulator(modulator), space(space),
+        action_space(action_space) {}
+
+    ~Brain() {}
+
+    std::array<float, 2> call(std::array<float, 2>& v,
+                              float collision,
+                              float reward) {
+
+        // get the activation of the space
+        auto [u, _] = space.call(v);
+
+        // get the activation of the modulator
+        float mod = modulator.call(u, collision);
+
+        // get the action
+        return action_space.sample_once();
+    }
+
+    std::string str() { return "Brain"; }
+    std::string repr() { return "Brain"; }
+
+};
 
 
 /* ========================================== */

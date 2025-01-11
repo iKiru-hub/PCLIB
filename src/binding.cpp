@@ -387,6 +387,27 @@ PYBIND11_MODULE(pclib, m) {
         .def("get_output", &Circuits::get_output)
         .def("get_leaky_v", &Circuits::get_leaky_v);
 
+    /* MODULES */
+    py::class_<TargetProgram>(m, "TargetProgram")
+        .def(py::init<float, float, PCNNgridhex&,
+             BaseModulation&, int, float>(),
+             py::arg("threshold1"),
+             py::arg("speed"),
+             py::arg("space"),
+             py::arg("modulator"),
+             py::arg("max_depth") = 20,
+             py::arg("threshold2") = 0.8f)
+        .def("__len__", &TargetProgram::len)
+        .def("__str__", &TargetProgram::str)
+        .def("__repr__", &TargetProgram::repr)
+        .def("update", &TargetProgram::update,
+             py::arg("activation"))
+        .def("evaluate", &TargetProgram::evaluate,
+             py::arg("next_representation"),
+             py::arg("curr_representation"))
+        .def("get_trg_representation",
+             &TargetProgram::get_trg_representation);
+
 
     /* ACTION SAMPLING MODULE */
 
@@ -403,6 +424,7 @@ PYBIND11_MODULE(pclib, m) {
         .def("__str__", &ActionSampling2D::str)
         .def("__repr__", &ActionSampling2D::repr)
         .def("reset", &ActionSampling2D::reset)
+        .def("sample_once", &ActionSampling2D::sample_once)
         .def("is_done", &ActionSampling2D::is_done)
         .def("get_idx", &ActionSampling2D::get_idx)
         .def("get_counter", &ActionSampling2D::get_counter)
@@ -435,6 +457,21 @@ PYBIND11_MODULE(pclib, m) {
              py::arg("y"))
         .def("__str__", &Hexagon::str)
         .def("get_centers", &Hexagon::get_centers);
+
+    // Brain
+    py::class_<Brain>(m, "Brain")
+        .def(py::init<BaseModulation&,
+             PCNNgridhex&, ActionSampling2D&>(),
+             py::arg("modulator"),
+             py::arg("pcnn"),
+             py::arg("sampler"))
+        .def("__call__", &Brain::call,
+             py::arg("v"),
+             py::arg("collision") = 0.0f,
+             py::arg("reward") = 0.0f)
+        .def("__str__", &Brain::str)
+        .def("__repr__", &Brain::repr);
+
 
 }
 
