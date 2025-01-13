@@ -452,6 +452,36 @@ Eigen::VectorXf linspace(float start, float end, int num)
     return linspaced;
 }
 
+// @brief same but with vector
+std::vector<float> linspace(float start, float end, int num,
+                            bool startpoint = true,
+                            bool endpoint = true)
+{
+    if (num <= 0) {
+        return std::vector<float>(); // Return an empty vector
+    }
+
+    if (num == 1) {
+        return std::vector<float>{start};
+    }
+
+    if (!endpoint) {
+        end = end - (end - start) / num;
+    }
+    if (!startpoint) {
+        start = start + (end - start) / num;
+    }
+
+    std::vector<float> linspaced(num);
+    float delta = (end - start) / (num - 1);
+
+    for (int i = 0; i < num; ++i) {
+        linspaced[i] = start + delta * i;
+    }
+
+    return linspaced;
+}
+
 // @brief threshold a vector
 std::vector<float> threshold_vector(const std::vector<float>& vec,
                                     float threshold,
