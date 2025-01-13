@@ -4,6 +4,7 @@
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <iostream>
+#include <Eigen/Dense>
 
 namespace py = pybind11;
 
@@ -127,7 +128,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("get_wrec", &PCNNgridhex::get_wrec)
         .def("get_connectivity",\
              &PCNNgridhex::get_connectivity)
-        .def("get_centers", &PCNNgridhex::get_centers)
+        .def("get_centers", &PCNNgridhex::get_centers,
+             py::arg("nonzero") = false)
         .def("get_delta_update",\
              &PCNNgridhex::get_delta_update)
         .def("get_positions_gcn", \
@@ -177,7 +179,8 @@ PYBIND11_MODULE(pclib, m) {
         .def("get_wff", &PCNNgrid::get_wff)
         .def("get_wrec", &PCNNgrid::get_wrec)
         .def("get_connectivity", &PCNNgrid::get_connectivity)
-        .def("get_centers", &PCNNgrid::get_centers)
+        .def("get_centers", &PCNNgrid::get_centers,
+             py::arg("nonzero") = false)
         .def("get_delta_update", &PCNNgrid::get_delta_update)
         .def("fwd_ext", &PCNNgrid::fwd_ext,
              py::arg("x"))
@@ -389,25 +392,43 @@ PYBIND11_MODULE(pclib, m) {
 
     /* MODULES */
     py::class_<TargetProgram>(m, "TargetProgram")
-        .def(py::init<float, float, PCNNgridhex&,
+        .def(py::init<float,
+             Eigen::MatrixXf,
              BaseModulation&, int, float>(),
              py::arg("threshold1"),
-             py::arg("speed"),
-             py::arg("space"),
+             py::arg("wrec"),
              py::arg("modulator"),
              py::arg("max_depth") = 20,
              py::arg("threshold2") = 0.8f)
         .def("__len__", &TargetProgram::len)
         .def("__str__", &TargetProgram::str)
         .def("__repr__", &TargetProgram::repr)
+        .def("is_active", &TargetProgram::is_active)
         .def("update", &TargetProgram::update,
              py::arg("activation"))
         .def("evaluate", &TargetProgram::evaluate,
              py::arg("next_representation"),
              py::arg("curr_representation"))
+        .def("set_wrec", &TargetProgram::set_wrec,
+             py::arg("wrec"))
         .def("get_trg_representation",
              &TargetProgram::get_trg_representation);
 
+    // 2 layer network
+    py::class_<ExperienceModule>(m, "ExperienceModule")
+        .def(py::init<float, Circuits&, TargetProgram&,
+             PCNNgrid&, OneLayerNetwork&>(),
+             py::arg("speed"),
+             py::arg("circuits"),
+             py::arg("trgp"),
+             py::arg("space"),
+             py::arg("eval_network"))
+        .def("__call__", &ExperienceModule::call,
+             py::arg("directive"))
+        .def("__str__", &ExperienceModule::str)
+        .def("__repr__", &ExperienceModule::repr)
+        .def("get_action_seq", &ExperienceModule::get_action_seq)
+        .def("get_plan", &ExperienceModule::get_plan);
 
     /* ACTION SAMPLING MODULE */
 
@@ -442,11 +463,12 @@ PYBIND11_MODULE(pclib, m) {
 
     // 1 layer network
     py::class_<OneLayerNetwork>(m, "OneLayerNetwork")
-        .def(py::init<std::array<float, 5>>(),
+        .def(py::init<std::vector<float>>(),
              py::arg("weights"))
         .def("__call__", &OneLayerNetwork::call,
              py::arg("x"))
         .def("__str__", &OneLayerNetwork::str)
+        .def("len", &OneLayerNetwork::len)
         .def("get_weights", &OneLayerNetwork::get_weights);
 
     // Hexagon
@@ -460,18 +482,47 @@ PYBIND11_MODULE(pclib, m) {
 
     // Brain
     py::class_<Brain>(m, "Brain")
-        .def(py::init<BaseModulation&,
-             PCNNgridhex&, ActionSampling2D&>(),
-             py::arg("modulator"),
+        .def(py::init<Circuits&,
+             PCNNgrid&,
+             TargetProgram&,
+             ExperienceModule&>(),
+             py::arg("circuits"),
              py::arg("pcnn"),
-             py::arg("sampler"))
+             py::arg("trgp"),
+             py::arg("expmd"))
         .def("__call__", &Brain::call,
              py::arg("v"),
              py::arg("collision") = 0.0f,
-             py::arg("reward") = 0.0f)
+             py::arg("reward") = 0.0f,
+             py::arg("position"))
+        .def("get_representation",
+             &Brain::get_representation)
+        .def("get_trg_representation",
+             &Brain::get_trg_representation)
         .def("__str__", &Brain::str)
         .def("__repr__", &Brain::repr);
 
+    // Brain Hex
+    py::class_<BrainHex>(m, "BrainHex")
+        .def(py::init<Circuits&,
+             PCNNgridhex&, ActionSampling2D&,
+             TargetProgram&>(),
+             py::arg("circuits"),
+             py::arg("pcnn"),
+             py::arg("sampler"),
+             py::arg("trgp"))
+        .def("__call__", &BrainHex::call,
+             py::arg("v"),
+             py::arg("collision") = 0.0f,
+             py::arg("reward") = 0.0f,
+             py::arg("position"))
+        .def("get_representation",
+             &BrainHex::get_representation)
+        .def("get_trg_representation",
+             &BrainHex::get_trg_representation)
+        .def("__str__", &BrainHex::str)
+        .def("__repr__", &BrainHex::repr);
 
 }
+
 

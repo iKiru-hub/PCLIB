@@ -240,7 +240,7 @@ public:
         y = Eigen::VectorXf::Zero(N);
     }
 
-    virtual ~InputLayer() { LOG("[-] InputLayer destroyed"); }
+    virtual ~InputLayer() {} //LOG("[-] InputLayer destroyed"); }
     virtual Eigen::VectorXf call(const Eigen::Vector2f& x){};
 
     std::string str() { return "InputLayer"; }
@@ -440,10 +440,10 @@ public:
         DEBUG("Basis type: " + basis_type);
 
         // make matrix
-        LOG("[+] GridLayer created");
+        /* LOG("[+] GridLayer created"); */
     }
 
-    ~GridLayer() { LOG("[-] GridLayer destroyed"); }
+    ~GridLayer() {} // LOG("[-] GridLayer destroyed"); }
 
     // @brief call the GridLayer with a 2D input
     Eigen::VectorXf call(const std::array<float, 2>& v) {
@@ -507,6 +507,15 @@ public:
         }
 
         return yfwd;
+    }
+
+    std::array<float, 2> calculate_velocity(Eigen::VectorXf& x) {
+        Eigen::Vector2f v = Eigen::Vector2f::Zero();
+        for (int i = 0; i < N; i++) {
+            v(0) += x(i) * positions(i, 0);
+            v(1) += x(i) * positions(i, 1);
+        }
+        return {v(0), v(1)};
     }
 
     std::string str() const { return "GridLayer"; }
@@ -642,15 +651,20 @@ private:
     void calc_activation() {
         float dist_squared;
         for (int i = 0; i < N; i++) {
-
-            /* dist_squared = std::pow( */
-            /*     positions(i, 0) - 0.5f, 2) + \ */
-            /*     std::pow(positions(i, 1) - 0.5f, 2); */
             dist_squared = std::pow(positions(i, 0), 2) + \
                 std::pow(positions(i, 1), 2);
-
             y(i) = std::exp(-dist_squared / sigma);
         }
+    }
+
+    void calc_inverse_activation(Eigen::VectorXf& x) {
+
+        Eigen::VectorXf z = Eigen::VectorXf::Zero(N);
+        float dist_squared;
+        for (int i = 0; i < N; i++) {
+            dist_squared = std::log(x(i)) * -sigma;
+        }
+
     }
 
     // apply boundary conditions
@@ -1730,10 +1744,6 @@ public:
 
     }
 
-   /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
-   /*      std::pair<Eigen::VectorXf, Eigen::VectorXf> ans = call(x); */
-   /*      return ans.first; */
-   /*  } */
    Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
 
         // pass the input through the filter layer
@@ -1755,14 +1765,6 @@ public:
    Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
         return Wrec * a + pre_x;
     }
-
-   /* Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) { */
-   /*      return call(x, true, false); */
-   /*  } */
-
-   /* Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) { */
-        /* return Wrec * a + pre_x; */
-    /* } */
 
     void reset() {
         u = Eigen::VectorXf::Zero(N);
@@ -1788,7 +1790,25 @@ public:
     Eigen::MatrixXf get_wff() const { return Wff; }
     Eigen::MatrixXf get_wrec() const { return Wrec; }
     Eigen::MatrixXf get_connectivity() const { return connectivity; }
-    Eigen::MatrixXf get_centers() const { return centers; }
+    Eigen::MatrixXf get_centers(bool nonzero = false) const {
+
+        if (!nonzero) {
+            return centers;
+        }
+
+        // filter out the non-zero centers
+        std::vector<int> idxs;
+        for (int i = 0; i < N; i++) {
+            if (centers.row(i).sum() != 0.0) {
+                idxs.push_back(i);
+            }
+        }
+        Eigen::MatrixXf centers = Eigen::MatrixXf::Zero(idxs.size(), 2);
+        for (int i = 0; i < idxs.size(); i++) {
+            centers.row(i) = this->centers.row(idxs[i]);
+        }
+        return centers;
+    }
     Eigen::VectorXf get_trace() const { return trace; }
     float get_delta_update() const { return delta_wff; }
     Eigen::MatrixXf get_positions_gcn() {
@@ -1797,11 +1817,6 @@ public:
     void reset_gcn(std::array<float, 2> v) {
         xfilter.reset(v);
     }
-
-    /* Eigen::MatrixXf get_centers() { */
-    /*     return utils::calc_centers_from_layer( */
-    /*         Wff, xfilter.get_centers()); */
-    /* } */
 
     // @brief modulate the density of new PCs
     void ach_modulation(float ach) {
@@ -2076,22 +2091,6 @@ public:
         return Wrec * a + pre_x;
     }
 
-    /* std::vector<float> fwd_int(const std::vector<float>& a) { */
-
-    /*     // convert Wrec into a float vector */
-    /*     float *data = Wrec.data(); */
-    /*     std::vector<float> Wrec_vec(data, data + Wrec.size()); */
-
-    /*     std::vector<float> out; */
-
-    /*     // activation */
-    /*     std::vector<float> res = Wrec_vec * a + pre_x; */
-    /*     for (size_t i = 0; i < res.size(); i++) { */
-    /*         out.push_back(res(i)); */
-    /*     } */
-    /*     return out; */
-    /* } */
-
     void reset() {
         u = Eigen::VectorXf::Zero(N);
         trace = Eigen::VectorXf::Zero(N);
@@ -2117,7 +2116,25 @@ public:
     Eigen::MatrixXf get_wff() const { return Wff; }
     Eigen::MatrixXf get_wrec() const { return Wrec; }
     Eigen::MatrixXf get_connectivity() const { return connectivity; }
-    Eigen::MatrixXf get_centers() const { return centers; }
+    Eigen::MatrixXf get_centers(bool nonzero = false) const {
+
+        if (!nonzero) {
+            return centers;
+        }
+
+        // filter out the non-zero centers
+        std::vector<int> idxs;
+        for (int i = 0; i < N; i++) {
+            if (centers.row(i).sum() != 0.0) {
+                idxs.push_back(i);
+            }
+        }
+        Eigen::MatrixXf centers = Eigen::MatrixXf::Zero(idxs.size(), 2);
+        for (int i = 0; i < idxs.size(); i++) {
+            centers.row(i) = this->centers.row(idxs[i]);
+        }
+        return centers;
+    }
     Eigen::VectorXf get_trace() const { return trace; }
     float get_delta_update() const { return delta_wff; }
     Eigen::MatrixXf get_positions_gcn() {
@@ -2222,6 +2239,233 @@ private:
         Wrec = Wrec.cwiseProduct(connectivity);
     }
 
+};
+
+
+class PCNNbase {
+public:
+    PCNNbase(int N, int Nj, float gain, float offset,
+         float clip_min, float threshold,
+         float rep_threshold,
+         float rec_threshold,
+         int num_neighbors, float trace_tau,
+         GridNetwork xfilter, std::string name = "2D")
+        : N(N), Nj(Nj), gain(gain), offset(offset),
+        clip_min(clip_min), threshold(threshold),
+        rep_threshold(rep_threshold),
+        rec_threshold(rec_threshold),
+        num_neighbors(num_neighbors),
+        trace_tau(trace_tau),
+        xfilter(std::move(xfilter)),
+        name(name) {
+
+        // Initialize the variables
+        Wff = Eigen::MatrixXf::Zero(N, Nj);
+        Wffbackup = Eigen::MatrixXf::Zero(N, Nj);
+        Wrec = Eigen::MatrixXf::Zero(N, N);
+        connectivity = Eigen::MatrixXf::Zero(N, N);
+        centers = Eigen::MatrixXf::Zero(N, 2);
+        mask = Eigen::VectorXf::Zero(N);
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        delta_wff = 0.0;
+        x_filtered = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+        cell_count = 0;
+
+        ach = 1.0;
+
+        this->fixed_centers = utils::generate_lattice(N);
+
+        // make vector of free indexes
+        for (int i = 0; i < N; i++) {
+            free_indexes.push_back(i);
+        }
+        fixed_indexes = {};
+    }
+
+    ~PCNNbase() { LOG("[-] PCNN destroyed"); }
+
+    std::pair<Eigen::VectorXf,
+    Eigen::VectorXf> call(const std::array<float, 2>& v,
+                          const bool frozen = false,
+                          const bool traced = true) {
+
+        // give a position v, calculate the activation
+        // as a gaussian distance
+        Eigen::VectorXf y = Eigen::VectorXf::Zero(N);
+        for (int i = 0; i < N; i++) {
+            y(i) = std::exp(-((v[0] - fixed_centers(i, 0)) *
+                              (v[0] - fixed_centers(i, 0)) +
+                              (v[1] - fixed_centers(i, 1)) *
+                              (v[1] - fixed_centers(i, 1))) / gain);
+        }
+
+        return std::make_pair(y, x_filtered);
+    }
+
+    // @brief update the model
+    void update(float x = -1.0, float y = -1.0) {};
+
+    Eigen::VectorXf fwd_ext(const std::array<float, 2>& x) {
+
+        // maybe use cosine similarity?
+        std::pair<Eigen::VectorXf, Eigen::VectorXf> res = \
+            call(x, true, false);
+
+        return res.first;
+    }
+
+   Eigen::VectorXf fwd_int(const Eigen::VectorXf& a) {
+        return Wrec * a + pre_x;
+    }
+
+    void reset() {
+        u = Eigen::VectorXf::Zero(N);
+        trace = Eigen::VectorXf::Zero(N);
+        pre_x = Eigen::VectorXf::Zero(N);
+    }
+
+    // Getters
+    int len() const { return cell_count; }
+    int get_size() const { return N; }
+    std::string str() const { return "PCNN." + name; }
+    std::string repr() const {
+        return "PCNN(" + name + std::to_string(N) + \
+            std::to_string(Nj) + std::to_string(gain) + \
+            std::to_string(offset) + \
+            std::to_string(rec_threshold) + \
+            std::to_string(num_neighbors) + \
+            std::to_string(trace_tau) + ")";
+    }
+    Eigen::VectorXf get_activation() const { return u; }
+    Eigen::VectorXf get_activation_gcn() const {
+        return xfilter.get_activation(); }
+    Eigen::MatrixXf get_wff() const { return Wff; }
+    Eigen::MatrixXf get_wrec() const { return Wrec; }
+    Eigen::MatrixXf get_connectivity() const { return connectivity; }
+    Eigen::MatrixXf get_centers(bool nonzero = false) const {
+
+        if (!nonzero) {
+            return centers;
+        }
+
+        // filter out the non-zero centers
+        std::vector<int> idxs;
+        for (int i = 0; i < N; i++) {
+            if (centers.row(i).sum() != 0.0) {
+                idxs.push_back(i);
+            }
+        }
+        Eigen::MatrixXf centers = Eigen::MatrixXf::Zero(idxs.size(), 2);
+        for (int i = 0; i < idxs.size(); i++) {
+            centers.row(i) = this->centers.row(idxs[i]);
+        }
+        return centers;
+    }
+    Eigen::VectorXf get_trace() const { return trace; }
+    float get_delta_update() const { return delta_wff; }
+    Eigen::MatrixXf get_positions_gcn() {
+        return xfilter.get_positions();
+    }
+    void reset_gcn(std::array<float, 2> v) {
+        xfilter.reset(v);
+    }
+
+    // @brief modulate the density of new PCs
+    void ach_modulation(float ach) {
+        this->ach = ach;
+    }
+
+private:
+    // parameters
+    const int N;
+    const int Nj;
+    const float gain;
+    const float offset;
+    const float clip_min;
+    const float threshold;
+    const float rep_threshold;
+    const float rec_threshold;
+    const int num_neighbors;
+    const float trace_tau;
+    const std::string name;
+    Eigen::MatrixXf fixed_centers;
+
+    float ach;
+
+    GridNetwork xfilter;
+
+    // variables
+    Eigen::MatrixXf Wff;
+    Eigen::MatrixXf Wffbackup;
+    float delta_wff;
+    Eigen::MatrixXf Wrec;
+    Eigen::MatrixXf connectivity;
+    /* Eigen::MatrixXf centers; */
+    Eigen::VectorXf mask;
+    std::vector<int> fixed_indexes;
+    std::vector<int> free_indexes;
+    int cell_count;
+    Eigen::VectorXf u;
+    Eigen::VectorXf x_filtered;
+    Eigen::VectorXf trace;
+    Eigen::VectorXf pre_x;
+    Eigen::MatrixXf centers;
+
+    // @brief check if one of the fixed neurons
+    int check_fixed_indexes() {
+
+        // if there are no fixed neurons, return -1
+        if (fixed_indexes.size() == 0) {
+            return -1;
+        };
+
+        // loop through the fixed indexes's `u` value
+        // and return the index with the highest value
+        int max_idx = -1;
+        float max_u = 0.0;
+        for (int i = 0; i < fixed_indexes.size(); i++) {
+            if (u(fixed_indexes[i]) > max_u) {
+                max_u = u(fixed_indexes[i]);
+                max_idx = fixed_indexes[i];
+            };
+        };
+
+        if (max_u < (threshold * ach) ) { return -1; }
+        else {
+            DEBUG("Fixed index above threshold: " + \
+                std::to_string(max_u) + \
+                " [" + std::to_string(threshold) + "]");
+            return max_idx; };
+    }
+
+    // @brief Quantify the indexes.
+    void make_indexes() {
+
+        free_indexes.clear();
+        for (int i = 0; i < N; i++) {
+            if (Wff.row(i).sum() > threshold) {
+                fixed_indexes.push_back(i);
+            } else {
+                free_indexes.push_back(i);
+            }
+        }
+    }
+
+    // @brief calculate the recurrent connections
+    void update_recurrent() {
+        // connectivity matrix
+        connectivity = utils::connectivity_matrix(
+            Wff, rec_threshold
+        );
+
+        // similarity
+        Wrec = utils::cosine_similarity_matrix(Wff);
+
+        // weights
+        Wrec = Wrec.cwiseProduct(connectivity);
+    }
 
 };
 
@@ -2483,7 +2727,8 @@ public:
     ~PopulationMaxProgram() {}
 
     float call(const Eigen::VectorXf& u) {
-        output = *std::max_element(u.begin(), u.end());
+        // compute the maximum activity
+        output = *std::max_element(u.data(), u.data() + u.size());
         return output;
     }
 
@@ -2509,13 +2754,13 @@ public:
 
     ~Circuits() {}
 
-    std::array<float, 3> call(const Eigen::VectorXf& u,
-                                         float collision,
-                                         float reward,
-                                         bool simulate = false) {
+    std::array<float, 3> call(Eigen::VectorXf& u,
+                              float collision,
+                              float reward,
+                              bool simulate = false) {
 
-        output[0] = da.call(u, reward, simulate);
-        output[1] = bnd.call(u, collision, simulate);
+        output[0] = bnd.call(u, collision, simulate);
+        output[1] = da.call(u, reward, simulate);
         output[2] = pmax.call(u);
 
         return output;
@@ -2538,17 +2783,17 @@ class TargetProgram {
     bool active;
     int max_depth;
     int size;
-    float speed;
     Eigen::VectorXf trg_representation;
-    PCNNgridhex& space;
     BaseModulation& modulator;
+    Eigen::MatrixXf wrec;
 
     std::tuple<Eigen::VectorXf, bool> converge_to_location(
-        Eigen::VectorXf& representation,
+        Eigen::VectorXf representation,
         int depth, Eigen::VectorXf& modulation) {
 
         // recurrent step in the space
-        Eigen::VectorXf u = space.fwd_int(representation);
+        /* Eigen::VectorXf u = space.fwd_int(representation); */
+        Eigen::VectorXf u = wrec * representation + modulation;
 
         float similarity = utils::cosine_similarity_vec(
             representation, u);
@@ -2565,15 +2810,15 @@ class TargetProgram {
 public:
 
     TargetProgram(float threshold1,
-                  float speed,
-                  PCNNgridhex& space,
+                  Eigen::MatrixXf wrec,
                   BaseModulation& modulator,
                   int max_depth = 20,
                   float threshold2=0.8):
         threshold1(threshold1), threshold2(threshold2),
-        speed(speed), space(space), modulator(modulator),
-        active(false), size(space.len()){
+        wrec(wrec), modulator(modulator),
+        active(false), size(wrec.rows()), max_depth(max_depth) {
 
+        size = wrec.rows();
         trg_representation = Eigen::VectorXf::Zero(size);
 
         LOG("[+] TargetProgram created");
@@ -2595,10 +2840,13 @@ public:
         Eigen::VectorXf modulation = modulator.get_weights();
 
         if (active) {
-            Eigen::VectorXf representation(size);
+            Eigen::VectorXf representation = \
+                Eigen::VectorXf::Zero(size);
             auto [trg_representation, active] = \
                 converge_to_location(representation,
                                      0, modulation);
+            /* trg_representation = representation; */
+            /* active = false; */
         };
     }
 
@@ -2625,6 +2873,10 @@ public:
     std::string str() { return "TargetProgram"; }
     std::string repr() { return "TargetProgram"; }
     int len() { return 1; }
+    bool is_active() { return active; }
+    void set_wrec(Eigen::MatrixXf wrec) {
+        this->wrec = wrec;
+    }
 };
 
 
@@ -2640,7 +2892,7 @@ public:
     std::string name;
 
     ActionSampling2D(std::string name,
-                   float speed) : name(name)
+                     float speed) : name(name)
                 {
         update_actions(speed);
         /* utils::logging.log("[+] ActionSampling2D." + name); */
@@ -2844,34 +3096,33 @@ private:
 
 struct OneLayerNetwork {
 
+    const std::vector<float> weights;
+    float output;
+    int size;
+
+
     // @brief forward an input through the network
     // @return tuple(float, array<float, 2>)
-    std::tuple<float, std::array<float, 5>>
-    call(const std::array<float, 5> x) {
+    std::pair<std::vector<float>, float>
+    call(const std::vector<float>& x) {
 
         output = 0.0;
-        z = {};
-        for (size_t i = 0; i < 5; i++) {
+        std::vector<float> z(size, 0.0);
+        for (size_t i = 0; i < size; i++) {
             output += x[i] * weights[i];
-            z[i] = x[i] * weights[i];
+            z.push_back(x[i] * weights[i]);
         }
-        return std::make_tuple(output, z);
+        return std::make_pair(z, output);
     }
 
-    OneLayerNetwork(std::array<float, 5> weights)
+    OneLayerNetwork(std::vector<float> weights)
         : weights(weights) {
-        z = {};
+        size = weights.size();
     }
     ~OneLayerNetwork() {}
     std::string str() { return "OneLayerNetwork"; }
-    std::array<float, 5> get_weights() { return weights; }
-
-private:
-
-    const std::array<float, 5> weights;
-    float output;
-    std::array<float, 5> z;
-
+    int len() { return size; }
+    std::vector<float> get_weights() { return weights; }
 };
 
 
@@ -2879,8 +3130,249 @@ private:
 /* =========== EXPERIENCE MODULE ============ */
 /* ========================================== */
 
+struct Plan {
+    std::array<float, 2> action;
+    std::vector<std::array<float, 2>> action_seq;
+    std::vector<std::vector<float>> value_seq;
+    std::vector<float> score_seq;
+    const int max_depth;
+    int depth;
+    int t;
+
+    bool is_done() {
+        return t == depth;
+    }
+    bool is_last() {
+        return t == (depth - 1);
+    }
+    std::array<float, 2> step() {
+        t = is_last() ? t : t + 1;
+        /* std::cout << "t: " << t << std::endl; */
+        this->action = action_seq[t];
+        return action;
+    }
+    void renew(std::tuple<std::vector<std::array<float, 2>>,
+              std::vector<std::vector<float>>,
+              std::vector<float>,
+              int> data) {
+        this->action_seq = std::get<0>(data);
+        this->value_seq = std::get<1>(data);
+        this->score_seq = std::get<2>(data);
+        this->depth = std::get<3>(data);
+        t = 0;
+    }
+
+    Plan(const int max_depth = 10):
+        max_depth(max_depth) {
+        this->t = 0;
+        this->action = {0.0f, 0.0f};
+        std::vector<std::array<float, 2>> action_seq(depth);
+        this->action_seq = action_seq;
+        this->value_seq = {};
+        this->score_seq = {};
+        this->depth = 0;
+    }
+    ~Plan() {}
+};
+
+struct PlanningPolicy {
+
+    OneLayerNetwork& evaluation_network;
+    float score_threshold;
+
+    PlanningPolicy(OneLayerNetwork& evaluation_network,
+                   float score_threshold):
+        evaluation_network(evaluation_network),
+        score_threshold(score_threshold) {}
+    ~PlanningPolicy() {}
+
+    std::pair<std::vector<float>, float> evaluate(
+        std::vector<float>& values) {
+        std::pair<std::vector<float>, float> results = \
+            evaluation_network.call(values);
+
+        // check if the score is above the threshold
+        if (results.second < score_threshold) {
+            return {results.first, 0.0};
+        }
+        return results;
+    }
+
+},
+
 
 class ExperienceModule {
+
+    // components
+    ActionSampling2D action_space_one;
+    ActionSampling2D action_space_two;
+    Circuits& circuits;
+    TargetProgram& trgp;
+    PCNNgrid& space;
+    OneLayerNetwork& eval_network;
+    float speed;
+
+    // variables
+    Plan plan;
+
+    std::tuple<std::vector<std::array<float, 2>>,
+               std::vector<std::vector<float>>,
+               std::vector<float>,
+               int> \
+        main_rollout(Eigen::VectorXf curr_representation) {
+
+        action_space_one.reset();
+
+        std::vector<std::array<float, 2>> new_action_seq;
+        std::vector<std::vector<float>> values_seq;  // for each mod
+        std::vector<float> scores_seq;  // for each action
+        int depth = 0;
+
+        // outer loop
+        while (!action_space_one.is_done()) {
+
+            // sample the next action
+            std::tuple<std::array<float, 2>, bool, int> action_data = \
+                action_space_one.call();
+
+            // re-initialize the provisional plan
+            new_action_seq = {};
+            values_seq = {};
+            scores_seq = {};
+            depth = 0;
+
+            // step and evaluate
+            Eigen::VectorXf next_representation = \
+                space.fwd_ext(std::get<0>(action_data));
+
+            std::pair<std::vector<float>, float> \
+                evaluation = evaluate_action(curr_representation,
+                                             next_representation);
+
+            // update the provisional plan
+            new_action_seq.push_back(std::get<0>(action_data));
+            values_seq.push_back(evaluation.first);
+            scores_seq.push_back(evaluation.second);
+            depth++;
+
+            curr_representation = next_representation;
+
+            // inner loop
+            inner_rollout(curr_representation,
+                          new_action_seq,
+                          values_seq,
+                          scores_seq,
+                          depth);
+        }
+
+        return {new_action_seq, values_seq, scores_seq, depth};
+    }
+
+    void inner_rollout(Eigen::VectorXf curr_representation,
+                       std::vector<std::array<float, 2>>& new_action_seq,
+                       std::vector<std::vector<float>>& values_seq,
+                       std::vector<float>& scores_seq,
+                       int& depth) {
+
+        action_space_two.reset();
+
+        // loop
+        while (!action_space_two.is_done()) {
+
+            // sample the next action
+            std::tuple<std::array<float, 2>, bool, int> action_data = \
+                action_space_two.call();
+
+            // step
+            Eigen::VectorXf next_representation = \
+                space.fwd_ext(std::get<0>(action_data));
+
+            // evaluate
+            std::pair<std::vector<float>, float> \
+                evaluation = evaluate_action(curr_representation,
+                                             next_representation);
+
+            // check
+            bool validation = check_step();
+
+            if (!validation || depth == plan.max_depth) {
+                break;
+            }
+
+            // update the provisional plan
+            new_action_seq.push_back(std::get<0>(action_data));
+            values_seq.push_back(evaluation.first);
+            scores_seq.push_back(evaluation.second);
+            curr_representation = next_representation;
+            depth++;
+        }
+    }
+
+    std::pair<std::vector<float>, float> \
+        evaluate_action(Eigen::VectorXf& curr_representation,
+                        Eigen::VectorXf& next_representation) {
+
+        std::array<float, 3> values_mod = circuits.call(
+            curr_representation, 0.0, 0.0, true);
+
+        float value_trg = trgp.evaluate(
+            curr_representation, next_representation);
+
+        std::vector<float> values = {values_mod[0],
+                                     values_mod[1],
+                                     values_mod[2],
+                                     value_trg};
+
+        // final score from the network
+        std::pair<std::vector<float>, float> score = \
+            eval_network.call(values);
+        return score;
+    }
+
+    bool check_step() { return true; }
+
+public:
+
+    ExperienceModule(float speed,
+                     Circuits& circuits,
+                     TargetProgram& trgp,
+                     PCNNgrid& space,
+                     OneLayerNetwork& eval_network):
+            action_space_one(ActionSampling2D("action_space_one", speed)),
+            action_space_two(ActionSampling2D("action_space_two", speed)),
+            circuits(circuits),
+            trgp(trgp), space(space), eval_network(eval_network),
+            plan(Plan()) {}
+
+    ~ExperienceModule() {}
+
+    std::pair<std::array<float, 2>, bool> call(std::string& directive) {
+
+        if (directive == "new") {
+            std::tuple<std::vector<std::array<float, 2>>,
+                       std::vector<std::vector<float>>,
+                       std::vector<float>,
+                       int> rollout_data = main_rollout(
+                           space.get_activation());
+            plan.renew(rollout_data);
+        };
+
+        // return the next action and whether the plan is done
+        return {plan.step(), plan.is_last()};
+    }
+
+    std::string str() { return "ExperienceModule"; }
+    std::string repr() { return "ExperienceModule"; }
+    std::vector<std::array<float, 2>> get_action_seq() {
+        return plan.action_seq;
+    }
+    std::tuple<std::vector<std::array<float, 2>>,
+               std::vector<std::vector<float>>,
+               std::vector<float>,
+               int> get_plan() {
+        return {plan.action_seq, plan.value_seq,
+                plan.score_seq, plan.depth};
+    }
 
 };
 
@@ -2891,38 +3383,136 @@ class ExperienceModule {
 /* ========================================== */
 
 
-class Brain {
+class BrainHex {
 
-    BaseModulation& modulator;
+    /* BaseModulation& modulator; */
+    Circuits& circuits;
     PCNNgridhex& space;
     ActionSampling2D& action_space;
+    TargetProgram& trgp;
 
 public:
 
-    Brain(BaseModulation& modulator,
+    BrainHex(Circuits& circuits,
           PCNNgridhex& space,
-          ActionSampling2D& action_space):
-        modulator(modulator), space(space),
-        action_space(action_space) {}
+          ActionSampling2D& action_space,
+          TargetProgram& trgp):
+        circuits(circuits),
+        space(space),
+        action_space(action_space),
+        trgp(trgp){}
 
-    ~Brain() {}
+    ~BrainHex() {}
 
-    std::array<float, 2> call(std::array<float, 2>& v,
+    // with Eigen
+    std::array<float, 2> call(const std::array<float, 2>& v,
                               float collision,
-                              float reward) {
+                              float reward = 0.0f,
+                              std::array<float, 2> position = {-1.0,
+                              -1.0}) {
 
-        // get the activation of the space
+        // update: space
         auto [u, _] = space.call(v);
+        space.update(position[0], position[1]);
 
-        // get the activation of the modulator
-        float mod = modulator.call(u, collision);
+        // update: circuits 
+        std::array<float, 3> state_int = \
+            circuits.call(u, collision, reward);
+
+        // update: trgp
+        trgp.set_wrec(space.get_wrec());
+        trgp.update(state_int[1]);
 
         // get the action
-        return action_space.sample_once();
+        std::array<float, 2> action = action_space.sample_once();
+        return {action[0], action[1]};
+        /* return action_space.sample_once(); */
     }
 
     std::string str() { return "Brain"; }
     std::string repr() { return "Brain"; }
+    Eigen::VectorXf get_trg_representation() {
+        return trgp.get_trg_representation();
+    }
+    Eigen::VectorXf get_representation() {
+        return space.get_activation();
+    }
+
+};
+
+
+
+class Brain {
+
+    /* BaseModulation& modulator; */
+    Circuits& circuits;
+    PCNNgrid& space;
+    TargetProgram& trgp;
+    ExperienceModule& expmd;
+
+    std::string directive;
+
+public:
+
+    Brain(Circuits& circuits,
+          PCNNgrid& space,
+          TargetProgram& trgp,
+          ExperienceModule& expmd):
+        circuits(circuits),
+        space(space),
+        trgp(trgp),
+        expmd(expmd),
+        directive("new"){}
+
+    ~Brain() {}
+
+    // with Eigen
+    std::array<float, 2> call(const std::array<float, 2>& v,
+                              float collision,
+                              float reward = 0.0f,
+                              std::array<float, 2> position = {-1.0,
+                              -1.0}) {
+
+        // === updates ===
+        // :space
+        auto [u, _] = space.call(v);
+        space.update(position[0], position[1]);
+
+        // :circuits 
+        std::array<float, 3> state_int = \
+            circuits.call(u, collision, reward);
+
+        // :trgp
+        trgp.set_wrec(space.get_wrec());
+        trgp.update(state_int[1]);
+
+        // === plan ===
+
+        // :experience module
+        std::pair<std::array<float, 2>, bool> action_data = \
+            expmd.call(directive);
+
+        // check if the plan is done
+        if (action_data.second) {
+            directive = "new";
+        } else {
+            directive = "continue";
+        }
+
+        // === output ===
+        std::array<float, 2> action = action_data.first;
+
+        return {action[0], action[1]};
+    }
+
+    std::string str() { return "Brain"; }
+    std::string repr() { return "Brain"; }
+    Eigen::VectorXf get_trg_representation() {
+        return trgp.get_trg_representation();
+    }
+    Eigen::VectorXf get_representation() {
+        return space.get_activation();
+    }
 
 };
 
@@ -3054,4 +3644,170 @@ void test_gridlayer() {
     std::array<float, 2> x = {0.2, 0.2};
     gc.call(x);
 }
+
+
+void test_trgp() {
+
+    // make Da
+    BaseModulation da = BaseModulation("DA", 5, 0.1, 0.1, 0.0,
+                                       0.0, 0.0, 0.0, 0.0);
+
+    // make trg program
+    Eigen::MatrixXf wrec = Eigen::MatrixXf::Random(5, 5);
+    TargetProgram trgp = TargetProgram(0.0f, wrec, da, 20, 0.8f);
+
+    std::cout << "Created: " << trgp.str() << std::endl;
+
+    // step
+    float activation = 0.1f;
+
+    // update
+    trgp.update(activation);
+
+    // get trg representation
+    Eigen::VectorXf trg = trgp.get_trg_representation();
+    utils::logging.log_vector(trg);
+
+}
+
+
+void test_brain() {
+
+    // make circuit
+    BaseModulation da = BaseModulation("DA", 5, 0.1, 0.1, 0.0,
+                                       0.0, 0.0, 0.0, 0.0);
+    BaseModulation bnd = BaseModulation("BND", 5, 0.1, 0.1, 0.0,
+                                        0.0, 0.0, 0.0, 0.0);
+    Circuits circuits = Circuits(da, bnd);
+
+    // make space
+    std::vector<GridHexLayer> layers;
+    layers.push_back(GridHexLayer(0.03, 0.1));
+    layers.push_back(GridHexLayer(0.05, 0.09));
+    layers.push_back(GridHexLayer(0.04, 0.08));
+    layers.push_back(GridHexLayer(0.03, 0.07));
+    layers.push_back(GridHexLayer(0.04, 0.06));
+    GridHexNetwork xfilter = GridHexNetwork(layers);
+    PCNNgridhex space = PCNNgridhex(50, xfilter.len(), 7, 1.5, 0.01,
+                                    0.1, 0.8, 0.1,
+                                    8, 0.1,
+                                    xfilter, "2D");
+
+    // make action space
+    ActionSampling2D action_space = ActionSampling2D("Test", 10);
+
+    // make target program
+    Eigen::MatrixXf wrec = space.get_wrec();
+    TargetProgram trgp = TargetProgram(0.0f, wrec, 
+                                       da, 20, 0.8f);
+
+    // make brain
+    BrainHex brain = BrainHex(circuits, space, action_space, trgp);
+
+    // call
+    std::array<float, 2> v = {0.0f, 0.0f};
+    std::array<float, 2> v_arr = brain.call(v, 0.0f, 0.0f, {-1.0f, -1.0f});
+
+    std::cout << "Brain: " << brain.str() << std::endl;
+    std::cout << "Action: " << v_arr[0] << ", " << v_arr[1] << std::endl;
+
+    Eigen::VectorXf trg = brain.get_trg_representation();
+    utils::logging.log_vector(trg);
+
+    v_arr = brain.call(v, 0.0f, 0.0f, {-1.0f, -1.0f});
+
+    std::cout << "Brain: " << brain.str() << std::endl;
+    std::cout << "Action: " << v_arr[0] << ", " << v_arr[1] << std::endl;
+    trg = brain.get_trg_representation();
+    utils::logging.log_vector(trg);
+
+    int count = space.len();
+    std::cout << "Space count: " << count << std::endl;
+
+    // loop
+    int duration = 10000;
+    std::array<float, 2> pos = {0.0f, 0.0f};
+    for (int i = 0; i < duration; i++) {
+        v = brain.call(v, 0.0f, 0.0f, {-1.0f, -1.0f});
+        pos[0] += v[0];
+        pos[1] += v[1];
+    }
+    std::cout << "count: " << space.len() << std::endl;
+
+}
+
+
+void test_brain_2() {
+
+    // make circuit
+    BaseModulation da = BaseModulation("DA", 5, 0.1, 0.1, 0.0,
+                                       0.0, 0.0, 0.0, 0.0);
+    BaseModulation bnd = BaseModulation("BND", 5, 0.1, 0.1, 0.0,
+                                        0.0, 0.0, 0.0, 0.0);
+    Circuits circuits = Circuits(da, bnd);
+
+    // make space
+    std::vector<GridLayer> layers;
+    layers.push_back(GridLayer(10, 0.03, 0.1));
+    layers.push_back(GridLayer(10, 0.05, 0.09));
+    layers.push_back(GridLayer(10, 0.04, 0.08));
+    layers.push_back(GridLayer(10, 0.03, 0.07));
+    layers.push_back(GridLayer(10, 0.04, 0.06));
+    GridNetwork xfilter = GridNetwork(layers);
+    PCNNgrid space = PCNNgrid(50, xfilter.len(), 7, 1.5, 0.01,
+                              0.1, 0.8, 0.1,
+                              8, 0.1,
+                              xfilter, "2D");
+
+    // make action space
+    ActionSampling2D action_space_one = ActionSampling2D("One", 10);
+    ActionSampling2D action_space_two = ActionSampling2D("Sec", 10);
+    OneLayerNetwork eval_network = OneLayerNetwork({0.1, 0.1, 0.1, 0.1});
+
+    // make target program
+    Eigen::MatrixXf wrec = space.get_wrec();
+    TargetProgram trgp = TargetProgram(0.0f, wrec, 
+                                       da, 20, 0.8f);
+
+    ExperienceModule expmd = ExperienceModule(2.0f,
+                                              circuits, trgp, space,
+                                              eval_network);
+
+    // make brain
+    Brain brain = Brain(circuits, space, trgp, expmd);
+
+    std::cout << "Brain declared..." << "\n";
+
+    // call
+    std::array<float, 2> v = {0.0f, 0.0f};
+    std::array<float, 2> v_arr = brain.call(v, 0.0f, 0.0f, {-1.0f, -1.0f});
+
+    std::cout << "Brain: " << brain.str() << std::endl;
+    std::cout << "Action: " << v_arr[0] << ", " << v_arr[1] << std::endl;
+
+    Eigen::VectorXf trg = brain.get_trg_representation();
+    utils::logging.log_vector(trg);
+
+    v_arr = brain.call(v, 0.0f, 0.0f, {-1.0f, -1.0f});
+
+    std::cout << "Brain: " << brain.str() << std::endl;
+    std::cout << "Action: " << v_arr[0] << ", " << v_arr[1] << std::endl;
+    trg = brain.get_trg_representation();
+    utils::logging.log_vector(trg);
+
+    int count = space.len();
+    std::cout << "Space count: " << count << std::endl;
+
+    // loop
+    int duration = 10000;
+    std::array<float, 2> pos = {0.0f, 0.0f};
+    for (int i = 0; i < duration; i++) {
+        v = brain.call(v, 0.0f, 0.0f, {-1.0f, -1.0f});
+        pos[0] += v[0];
+        pos[1] += v[1];
+    }
+    std::cout << "count: " << space.len() << std::endl;
+
+}
+
 };

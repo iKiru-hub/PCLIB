@@ -8,6 +8,46 @@ import matplotlib.pyplot as plt
 
 
 
+def test_brain2():
+
+    da = pclib.BaseModulation(name="DA", size=3, min_v=0.1,
+                              offset=0.01, gain=200.0)
+    bnd = pclib.BaseModulation(name="BND", size=3, min_v=0.1,
+                               offset=0.01, gain=200.0)
+    cir = pclib.Circuits(da, bnd)
+
+    layers = [
+        pclib.GridHexLayer(0.03, 0.1),
+        pclib.GridHexLayer(0.05, 0.9),
+        pclib.GridHexLayer(0.04, 0.08),
+        pclib.GridHexLayer(0.03, 0.07),
+        pclib.GridHexLayer(0.04, 0.05)
+    ]
+    xfilter = pclib.GridHexNetwork(layers)
+    space = pclib.PCNNgridhex(200, len(xfilter),
+                              7, 1.5, 0.01, 0.1, 0.8, 0.1,
+                              8, 0.1, xfilter, "2D")
+
+    sampler = pclib.ActionSampling2D("default", 1)
+    wrec = space.get_wrec()
+    trgp = pclib.TargetProgram(0., wrec, da, 20, 0.8)
+    brain = pclib.BrainHex(cir, space, sampler, trgp)
+
+    pos = [0., 0.]
+    posh = []
+    v = [0., 0.]
+    for _ in range(1900):
+        v = brain(v, 0., 0., pos)
+        #print("\n", pos)
+        pos[0] += v[0]
+        pos[1] += v[1]
+        #print(pos, pos[0], pos[1], v[0], v[1], "sum: ", pos[0]+v[0])
+        posh += [[pos[0], pos[1]]]
+
+    assert len(posh) == 1900, f"Position history is not correct {len(posh)}"
+
+
+
 
 def activity_over_grid(model):
 
@@ -39,8 +79,7 @@ def activity_over_grid(model):
     plt.show()
 
 
-
-if __name__ == "__main__":
+def main1():
 
     pclib.set_debug(False)
 
@@ -69,4 +108,12 @@ if __name__ == "__main__":
     _ = pcnn(x)
 
     activity_over_grid(pcnn)
+
+
+
+
+if __name__ == "__main__":
+
+
+    test_brain2()
 

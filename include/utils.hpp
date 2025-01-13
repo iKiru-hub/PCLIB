@@ -463,6 +463,52 @@ std::vector<float> threshold_vector(const std::vector<float>& vec,
     return result;
 }
 
+// @brief: eigen to vector
+std::vector<float> eigen_to_vector(const Eigen::VectorXf& vec) {
+    std::vector<float> result;
+    for (int i = 0; i < vec.size(); i++) {
+        result.push_back(vec(i));
+    }
+    return result;
+}
+
+// @brief: vector to eigen
+Eigen::VectorXf vector_to_eigen(const std::vector<float>& vec) {
+    Eigen::VectorXf result(vec.size());
+    for (size_t i = 0; i < vec.size(); i++) {
+        result(i) = vec[i];
+    }
+    return result;
+}
+
+// @brief: generate a lattice of points
+Eigen::MatrixXf generate_lattice(int N) {
+    // Determine the number of points along each axis
+    int grid_size = static_cast<int>(std::sqrt(N));
+    if (grid_size * grid_size < N) {
+        grid_size += 1; // Ensure we have at least N points
+    }
+
+    double step = 10.0 / (grid_size - 1); // Step size between points
+
+    // Initialize a matrix to store the points
+    Eigen::MatrixXf points(N, 2);
+
+    // Generate lattice points
+    int count = 0;
+    for (int i = 0; i < grid_size; ++i) {
+        for (int j = 0; j < grid_size; ++j) {
+            if (count >= N) break; // Stop if we have enough points
+
+            points(count, 0) = i * step;
+            points(count, 1) = j * step;
+            ++count;
+        }
+        if (count >= N) break;
+    }
+
+    return points.topRows(count); // Return only the rows with valid points
+}
 
 /* ========================================== */
 /* ============ MATRIX FUNCTIONS ============ */

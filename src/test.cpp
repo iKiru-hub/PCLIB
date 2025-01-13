@@ -1,7 +1,7 @@
 #include "../include/utils.hpp"
 #include "../include/pcnn.hpp"
 #include <ctime>
-#include <Eigen/Dense>
+/* #include <Eigen/Dense> */
 #include <unordered_map>
 #include <iostream>
 #include <array>
@@ -34,7 +34,9 @@ int main() {
     /* pcl::test_randlayer(); */
     /* pcl::test_gridlayer(); */
 
-    // test tanh
+    /* pcl::test_trgp(); */
+    /* pcl::test_brain(); */
+    pcl::test_brain_2();
 
     return 0;
 }
